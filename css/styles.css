@@ -348,8 +348,8 @@ input::placeholder { color: var(--text-muted); }
   margin-top: 6px;
   font-weight: 600;
 }
-.bm-neutral { fill: var(--surface-3); stroke: var(--border); stroke-width: 1; }
-.bm-region { stroke: var(--border); stroke-width: 1; }
+.bm-outline { fill: none; stroke: var(--baseline); stroke-width: 3; vector-effect: non-scaling-stroke; }
+.bm-region { stroke: var(--surface-1); stroke-width: 2; stroke-linejoin: round; vector-effect: non-scaling-stroke; }
 .bm-region.bm-zero { fill: var(--surface-3); }
 .bm-region.bm-active { fill: var(--series-2); fill-opacity: var(--bm-opacity, 0.3); }
 
