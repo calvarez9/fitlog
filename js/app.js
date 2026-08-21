@@ -31,6 +31,17 @@ function epley1RM(weight, reps) {
   return weight * (1 + reps / 30);
 }
 
+// "7:42 /mi" style pace string from minutes + distance, or null if either is missing/zero.
+function formatPace(durationMin, distance, unit) {
+  if (!durationMin || !distance) return null;
+  const paceMin = durationMin / distance;
+  const min = Math.floor(paceMin);
+  const sec = Math.round((paceMin - min) * 60);
+  const mm = sec === 60 ? min + 1 : min;
+  const ss = sec === 60 ? 0 : sec;
+  return `${mm}:${String(ss).padStart(2, "0")} /${unit}`;
+}
+
 // ==================== Tab navigation ====================
 function initTabs() {
   const tabBtns = $$(".tab-btn");
@@ -79,9 +90,46 @@ function addExerciseToWorkout(name, targetSets = 1, targetReps = null) {
   name = name.trim();
   const sets = [];
   for (let i = 0; i < Math.max(1, targetSets); i++) {
-    sets.push({ reps: targetReps || null, weight: null, done: false });
+    sets.push({ reps: targetReps || null, weight: null, rpe: null, done: false });
   }
-  currentWorkout.exercises.push({ exerciseName: name, sets });
+  currentWorkout.exercises.push({ exerciseName: name, sets, linkedToNext: false });
+  renderExerciseList();
+}
+
+// Groups consecutive exercises chained via linkedToNext into supersets.
+// Returns [{ letter: 'A'|null, indices: [i, ...] }]; letter is null for solo exercises.
+function computeExerciseGroups(exercises) {
+  const groups = [];
+  let i = 0;
+  let letterCode = 65; // 'A'
+  while (i < exercises.length) {
+    const indices = [i];
+    while (exercises[indices[indices.length - 1]]?.linkedToNext && indices[indices.length - 1] + 1 < exercises.length) {
+      indices.push(indices[indices.length - 1] + 1);
+    }
+    groups.push({ letter: indices.length > 1 ? String.fromCharCode(letterCode++) : null, indices });
+    i = indices[indices.length - 1] + 1;
+  }
+  return groups;
+}
+
+function suggestWarmups(ex) {
+  if (ex.sets.some((s) => s.isWarmup)) {
+    toast("Warm-ups already added");
+    return;
+  }
+  const target = ex.sets.find((s) => s.weight != null)?.weight;
+  if (!target) {
+    toast("Enter a working weight first");
+    return;
+  }
+  const round5 = (n) => Math.max(5, Math.round(n / 5) * 5);
+  const warmups = [
+    { reps: 8, weight: round5(target * 0.4), rpe: null, done: false, isWarmup: true },
+    { reps: 5, weight: round5(target * 0.6), rpe: null, done: false, isWarmup: true },
+    { reps: 3, weight: round5(target * 0.8), rpe: null, done: false, isWarmup: true },
+  ];
+  ex.sets.unshift(...warmups);
   renderExerciseList();
 }
 
@@ -89,48 +137,71 @@ function renderExerciseList() {
   const wrap = $("#exerciseList");
   wrap.innerHTML = "";
   const unit = db.getSettings().unit;
+  const groups = computeExerciseGroups(currentWorkout.exercises);
 
-  currentWorkout.exercises.forEach((ex, exIdx) => {
-    const card = document.createElement("div");
-    card.className = "exercise-card";
-    card.innerHTML = `
-      <div class="exercise-card-header">
-        <h3>${escapeHtml(ex.exerciseName)}</h3>
-        <button class="remove-exercise" data-ex="${exIdx}">Remove</button>
-      </div>
-      <div class="set-row-labels">
-        <span>#</span><span>Weight (${unit})</span><span>Reps</span><span>✓</span>
-      </div>
-      <div class="sets-table" data-ex="${exIdx}"></div>
-      <button class="add-set-btn" data-ex="${exIdx}">+ Add set</button>
-    `;
-    const setsTable = $(".sets-table", card);
-    ex.sets.forEach((set, setIdx) => {
-      const row = document.createElement("div");
-      row.className = "set-row";
-      row.innerHTML = `
-        <span class="set-index">${setIdx + 1}</span>
-        <input type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" class="weight-input" value="${set.weight ?? ""}">
-        <input type="number" inputmode="numeric" min="0" placeholder="0" class="reps-input" value="${set.reps ?? ""}">
-        <button class="set-done ${set.done ? "checked" : ""}" data-ex="${exIdx}" data-set="${setIdx}">${set.done ? "✓" : ""}</button>
+  groups.forEach((group) => {
+    const groupWrap = group.letter ? document.createElement("div") : wrap;
+    if (group.letter) {
+      groupWrap.className = "superset-group";
+      groupWrap.innerHTML = `<div class="superset-label">Superset ${group.letter}</div>`;
+      wrap.appendChild(groupWrap);
+    }
+
+    group.indices.forEach((exIdx) => {
+      const ex = currentWorkout.exercises[exIdx];
+      const hasNext = exIdx < currentWorkout.exercises.length - 1;
+      const card = document.createElement("div");
+      card.className = "exercise-card";
+      card.innerHTML = `
+        <div class="exercise-card-header">
+          <h3 class="exercise-name-display" data-ex="${exIdx}">${escapeHtml(ex.exerciseName)}</h3>
+          <div class="exercise-card-actions">
+            ${hasNext ? `<button class="link-exercise ${ex.linkedToNext ? "active" : ""}" data-ex="${exIdx}" title="Superset with next exercise">🔗</button>` : ""}
+            <button class="swap-exercise" data-ex="${exIdx}" title="Swap exercise">⇄</button>
+            <button class="remove-exercise" data-ex="${exIdx}">Remove</button>
+          </div>
+        </div>
+        <div class="set-row-labels">
+          <span>#</span><span>Weight (${unit})</span><span>Reps</span><span>RPE</span><span>✓</span>
+        </div>
+        <div class="sets-table" data-ex="${exIdx}"></div>
+        <div class="exercise-card-footer">
+          <button class="add-set-btn" data-ex="${exIdx}">+ Add set</button>
+          <button class="warmup-btn" data-ex="${exIdx}">✨ Add warm-ups</button>
+        </div>
       `;
-      $(".weight-input", row).addEventListener("input", (e) => {
-        set.weight = e.target.value === "" ? null : parseFloat(e.target.value);
+      const setsTable = $(".sets-table", card);
+      ex.sets.forEach((set, setIdx) => {
+        const row = document.createElement("div");
+        row.className = "set-row" + (set.isWarmup ? " warmup-row" : "");
+        row.innerHTML = `
+          <span class="set-index">${set.isWarmup ? "W" : setIdx + 1}</span>
+          <input type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" class="weight-input" value="${set.weight ?? ""}">
+          <input type="number" inputmode="numeric" min="0" placeholder="0" class="reps-input" value="${set.reps ?? ""}">
+          <input type="number" inputmode="decimal" step="0.5" min="0" max="10" placeholder="—" class="rpe-input" value="${set.rpe ?? ""}">
+          <button class="set-done ${set.done ? "checked" : ""}" data-ex="${exIdx}" data-set="${setIdx}">${set.done ? "✓" : ""}</button>
+        `;
+        $(".weight-input", row).addEventListener("input", (e) => {
+          set.weight = e.target.value === "" ? null : parseFloat(e.target.value);
+        });
+        $(".reps-input", row).addEventListener("input", (e) => {
+          set.reps = e.target.value === "" ? null : parseInt(e.target.value, 10);
+        });
+        $(".rpe-input", row).addEventListener("input", (e) => {
+          set.rpe = e.target.value === "" ? null : parseFloat(e.target.value);
+        });
+        $(".set-done", row).addEventListener("click", (e) => {
+          set.done = !set.done;
+          e.target.classList.toggle("checked", set.done);
+          e.target.textContent = set.done ? "✓" : "";
+          if (set.done) {
+            openRestTimer(true);
+          }
+        });
+        setsTable.appendChild(row);
       });
-      $(".reps-input", row).addEventListener("input", (e) => {
-        set.reps = e.target.value === "" ? null : parseInt(e.target.value, 10);
-      });
-      $(".set-done", row).addEventListener("click", (e) => {
-        set.done = !set.done;
-        e.target.classList.toggle("checked", set.done);
-        e.target.textContent = set.done ? "✓" : "";
-        if (set.done) {
-          openRestTimer(true);
-        }
-      });
-      setsTable.appendChild(row);
+      groupWrap.appendChild(card);
     });
-    wrap.appendChild(card);
   });
 
   $$(".remove-exercise", wrap).forEach((btn) =>
@@ -143,10 +214,57 @@ function renderExerciseList() {
     btn.addEventListener("click", () => {
       const ex = currentWorkout.exercises[+btn.dataset.ex];
       const last = ex.sets[ex.sets.length - 1];
-      ex.sets.push({ reps: last?.reps ?? null, weight: last?.weight ?? null, done: false });
+      ex.sets.push({ reps: last?.reps ?? null, weight: last?.weight ?? null, rpe: null, done: false });
       renderExerciseList();
     })
   );
+  $$(".warmup-btn", wrap).forEach((btn) =>
+    btn.addEventListener("click", () => suggestWarmups(currentWorkout.exercises[+btn.dataset.ex]))
+  );
+  $$(".link-exercise", wrap).forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const ex = currentWorkout.exercises[+btn.dataset.ex];
+      ex.linkedToNext = !ex.linkedToNext;
+      renderExerciseList();
+    })
+  );
+  $$(".swap-exercise", wrap).forEach((btn) =>
+    btn.addEventListener("click", () => startExerciseSwap(+btn.dataset.ex))
+  );
+}
+
+function startExerciseSwap(exIdx) {
+  const nameEl = $(`.exercise-name-display[data-ex="${exIdx}"]`);
+  if (!nameEl) return;
+  const ex = currentWorkout.exercises[exIdx];
+  const wrap = document.createElement("div");
+  wrap.className = "swap-input-row";
+  wrap.innerHTML = `
+    <input type="text" class="swap-input" list="exerciseOptions" value="${escapeHtml(ex.exerciseName)}" autocomplete="off">
+    <button class="icon-btn small swap-confirm" aria-label="Confirm swap">✓</button>
+  `;
+  nameEl.replaceWith(wrap);
+  const input = $(".swap-input", wrap);
+  input.focus();
+  input.select();
+
+  function confirm() {
+    const newName = input.value.trim();
+    if (newName) {
+      db.addCustomExercise(newName);
+      ex.exerciseName = newName;
+    }
+    renderExerciseList();
+    refreshExerciseDatalist();
+  }
+  $(".swap-confirm", wrap).addEventListener("click", confirm);
+  input.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      confirm();
+    }
+    if (e.key === "Escape") renderExerciseList();
+  });
 }
 
 // ==================== LOG VIEW: cardio ====================
@@ -186,6 +304,7 @@ function renderCardioList() {
   currentCardio.segments.forEach((seg, idx) => {
     const card = document.createElement("div");
     card.className = "exercise-card cardio-card";
+    const pace = formatPace(seg.durationMin, seg.distance, distUnit);
     card.innerHTML = `
       <div class="exercise-card-header">
         <h3>${escapeHtml(seg.activityType)}</h3>
@@ -195,6 +314,7 @@ function renderCardioList() {
         ${numberField("Duration (min)", "durationMin", seg, { step: 0.5 })}
         ${numberField(`Distance (${distUnit})`, "distance", seg, { step: 0.1 })}
       </div>
+      <div class="cardio-pace ${pace ? "" : "muted"}">${pace ? `Pace: ${pace}` : "Enter duration + distance for pace"}</div>
       <div class="cardio-field-grid thirds">
         ${numberField("Calories", "calories", seg)}
         ${numberField("Avg HR", "avgHr", seg)}
@@ -205,6 +325,10 @@ function renderCardioList() {
       input.addEventListener("input", (e) => {
         const v = e.target.value;
         seg[e.target.dataset.key] = v === "" ? null : parseFloat(v);
+        $(".cardio-pace", card).outerHTML = (() => {
+          const p = formatPace(seg.durationMin, seg.distance, distUnit);
+          return `<div class="cardio-pace ${p ? "" : "muted"}">${p ? `Pace: ${p}` : "Enter duration + distance for pace"}</div>`;
+        })();
       });
     });
     $(".remove-exercise", card).addEventListener("click", () => {
@@ -275,7 +399,9 @@ function initLogView() {
     const routine = db.getRoutines().find((r) => r.id === id);
     if (!routine) return;
     routine.exercises.forEach((re) => addExerciseToWorkout(re.exerciseName, re.targetSets, re.targetReps));
-    toast(`Loaded "${routine.name}"`);
+    const status = mesoStatus(routine);
+    const statusMsg = status ? (status.deload ? " — deload week" : ` — week ${status.weekNum} of ${status.totalWeeks}`) : "";
+    toast(`Loaded "${routine.name}"${statusMsg}`);
   });
 
   $("#finishWorkoutBtn").addEventListener("click", () => {
@@ -285,6 +411,7 @@ function initLogView() {
       const loggedExercises = currentWorkout.exercises
         .map((ex) => ({
           exerciseName: ex.exerciseName,
+          linkedToNext: !!ex.linkedToNext,
           sets: ex.sets.filter((s) => s.weight != null || s.reps != null),
         }))
         .filter((ex) => ex.sets.length > 0);
@@ -344,6 +471,8 @@ function cardioSegmentLine(seg, distUnit) {
   const parts = [];
   if (seg.durationMin != null) parts.push(`${round1(seg.durationMin)} min`);
   if (seg.distance != null) parts.push(`${round1(seg.distance)} ${distUnit}`);
+  const pace = formatPace(seg.durationMin, seg.distance, distUnit);
+  if (pace) parts.push(pace);
   if (seg.avgHr != null || seg.maxHr != null) {
     parts.push(`${seg.avgHr ?? "?"}${seg.maxHr != null ? "/" + seg.maxHr : ""} bpm`);
   }
@@ -351,7 +480,96 @@ function cardioSegmentLine(seg, distUnit) {
   return parts.join(" · ");
 }
 
+// ---------- Weekly summary ----------
+function getWeeklySummary() {
+  const { start, end, label } = getWeekRange(0);
+  const all = db.getWorkouts();
+  const thisWeek = all.filter((w) => {
+    const d = new Date(w.date);
+    return d >= start && d <= end;
+  });
+  const before = all.filter((w) => new Date(w.date) < start);
+
+  const strengthThisWeek = thisWeek.filter((w) => !isCardio(w));
+  const cardioThisWeek = thisWeek.filter(isCardio);
+
+  const totalSets = strengthThisWeek.reduce(
+    (n, w) => n + w.exercises.reduce((m, ex) => m + ex.sets.filter((s) => !s.isWarmup).length, 0),
+    0
+  );
+  const cardioMinutes = cardioThisWeek.reduce((n, w) => n + w.segments.reduce((m, s) => m + (s.durationMin || 0), 0), 0);
+
+  const priorBest = {};
+  before
+    .filter((w) => !isCardio(w))
+    .forEach((w) =>
+      w.exercises.forEach((ex) =>
+        ex.sets
+          .filter((s) => !s.isWarmup && s.weight != null)
+          .forEach((s) => {
+            const rm = epley1RM(s.weight, s.reps || 1);
+            if (!priorBest[ex.exerciseName] || rm > priorBest[ex.exerciseName]) priorBest[ex.exerciseName] = rm;
+          })
+      )
+    );
+
+  const prs = [];
+  strengthThisWeek.forEach((w) =>
+    w.exercises.forEach((ex) =>
+      ex.sets
+        .filter((s) => !s.isWarmup && s.weight != null)
+        .forEach((s) => {
+          const rm = epley1RM(s.weight, s.reps || 1);
+          const prior = priorBest[ex.exerciseName];
+          if (prior != null && rm > prior && !prs.some((p) => p.name === ex.exerciseName)) {
+            prs.push({ name: ex.exerciseName, weight: s.weight, reps: s.reps });
+          }
+        })
+    )
+  );
+
+  return {
+    label,
+    sessions: thisWeek.length,
+    totalSets,
+    cardioMinutes: round1(cardioMinutes),
+    prs,
+  };
+}
+
+function renderWeekSummary() {
+  const el = $("#weekSummaryCard");
+  const s = getWeeklySummary();
+  if (s.sessions === 0) {
+    el.innerHTML = `<div class="week-summary-empty">No workouts logged yet this week (${escapeHtml(s.label)}).</div>`;
+    return;
+  }
+  const stats = [
+    { label: "Sessions", value: s.sessions },
+    { label: "Sets", value: s.totalSets },
+  ];
+  if (s.cardioMinutes) stats.push({ label: "Cardio min", value: s.cardioMinutes });
+
+  el.innerHTML = `
+    <div class="week-summary-head">
+      <span class="week-summary-title">This Week</span>
+      <span class="muted small">${escapeHtml(s.label)}</span>
+    </div>
+    <div class="week-summary-stats">
+      ${stats.map((st) => `<div class="ws-stat"><div class="ws-stat-value">${st.value}</div><div class="ws-stat-label">${st.label}</div></div>`).join("")}
+    </div>
+    ${
+      s.prs.length
+        ? `<div class="week-summary-prs">🎉 PR${s.prs.length > 1 ? "s" : ""}: ${s.prs
+            .map((p) => `${escapeHtml(p.name)} (${p.reps ?? "?"}×${p.weight})`)
+            .join(", ")}</div>`
+        : ""
+    }
+  `;
+}
+
 function renderHistory() {
+  renderWeekSummary();
   const listEl = $("#historyList");
   const query = ($("#historySearch").value || "").toLowerCase().trim();
   let workouts = db.getWorkouts();
@@ -379,9 +597,16 @@ function renderHistory() {
           .map((seg) => `<div class="ex-line"><span>${escapeHtml(seg.activityType)}</span><span>${cardioSegmentLine(seg, distUnit)}</span></div>`)
           .join("")
       : w.exercises
-          .map((ex) => {
-            const setsStr = ex.sets.map((s) => `${s.reps ?? "?"}×${s.weight != null ? s.weight : "?"}${unit}`).join(", ");
-            return `<div class="ex-line"><span>${escapeHtml(ex.exerciseName)}</span><span>${setsStr}</span></div>`;
+          .map((ex, i) => {
+            const setsStr = ex.sets
+              .map((s) => {
+                const rpe = s.rpe != null ? ` @${s.rpe}` : "";
+                const warmupTag = s.isWarmup ? " w" : "";
+                return `${s.reps ?? "?"}×${s.weight != null ? s.weight : "?"}${unit}${rpe}${warmupTag}`;
+              })
+              .join(", ");
+            const link = ex.linkedToNext && w.exercises[i + 1] ? " 🔗" : "";
+            return `<div class="ex-line"><span>${escapeHtml(ex.exerciseName)}${link}</span><span>${setsStr}</span></div>`;
           })
           .join("");
 
@@ -430,7 +655,8 @@ function renderHistory() {
         currentWorkout = {
           exercises: w.exercises.map((ex) => ({
             exerciseName: ex.exerciseName,
-            sets: ex.sets.map((s) => ({ reps: s.reps, weight: s.weight, done: false })),
+            linkedToNext: !!ex.linkedToNext,
+            sets: ex.sets.filter((s) => !s.isWarmup).map((s) => ({ reps: s.reps, weight: s.weight, rpe: null, done: false })),
           })),
         };
         renderExerciseList();
@@ -449,6 +675,22 @@ function initHistoryView() {
 // ==================== ROUTINES VIEW ====================
 let routineDraft = null; // { id?, name, exercises: [{exerciseName, targetSets, targetReps}] }
 
+// Week X of Y + deload flag from a routine's mesocycle settings, or null if unset.
+function mesoStatus(routine) {
+  if (!routine.mesocycleWeeks || !routine.cycleStartDate) return null;
+  const daysSince = Math.floor((Date.now() - new Date(routine.cycleStartDate)) / (24 * 60 * 60 * 1000));
+  const weekNum = Math.floor(daysSince / 7) + 1;
+  return { weekNum, totalWeeks: routine.mesocycleWeeks, deload: weekNum > routine.mesocycleWeeks };
+}
+
+function mesoBadgeHtml(routine) {
+  const status = mesoStatus(routine);
+  if (!status) return "";
+  return status.deload
+    ? `<span class="tag deload">Deload suggested</span>`
+    : `<span class="tag movement">Week ${status.weekNum} of ${status.totalWeeks}</span>`;
+}
+
 function renderRoutines() {
   const listEl = $("#routinesList");
   const routines = db.getRoutines();
@@ -465,12 +707,14 @@ function renderRoutines() {
     card.innerHTML = `
       <div class="routine-card-top">
         <h3>${escapeHtml(r.name)}</h3>
+        ${mesoBadgeHtml(r)}
       </div>
       <div class="routine-ex-list">
         ${r.exercises.map((e) => `<div>${escapeHtml(e.exerciseName)} — ${e.targetSets}×${e.targetReps || "?"}</div>`).join("")}
       </div>
       <div class="routine-card-actions">
         <button class="btn secondary small edit-r" data-id="${r.id}">Edit</button>
+        ${r.mesocycleWeeks ? `<button class="btn secondary small restart-r" data-id="${r.id}">Start New Cycle</button>` : ""}
         <button class="btn danger small del-r" data-id="${r.id}">Delete</button>
       </div>
     `;
@@ -493,6 +737,16 @@ function renderRoutines() {
       }
     })
   );
+  $$(".restart-r", listEl).forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const r = db.getRoutines().find((x) => x.id === btn.dataset.id);
+      if (!r) return;
+      r.cycleStartDate = todayISO();
+      db.saveRoutine(r);
+      renderRoutines();
+      toast("New cycle started — Week 1");
+    })
+  );
 }
 
 function buildRoutineEditor() {
@@ -501,6 +755,8 @@ function buildRoutineEditor() {
   wrap.innerHTML = `
     <div class="field-label">Routine name</div>
     <input type="text" id="routineNameInput" value="${escapeHtml(routineDraft.name || "")}" placeholder="e.g. Push Day" />
+    <div class="field-label" style="margin-top:12px">Mesocycle length (weeks, optional)</div>
+    <input type="number" id="routineMesoInput" min="1" max="16" placeholder="e.g. 5" value="${routineDraft.mesocycleWeeks || ""}" />
     <div class="field-label" style="margin-top:12px">Exercises</div>
     <div id="routineExerciseRows"></div>
     <div class="add-exercise-row">
@@ -559,6 +815,12 @@ function buildRoutineEditor() {
       toast("Add at least one exercise");
       return;
     }
+    const mesoVal = parseInt($("#routineMesoInput", wrap).value, 10);
+    routineDraft.mesocycleWeeks = mesoVal > 0 ? mesoVal : null;
+    if (routineDraft.mesocycleWeeks && !routineDraft.cycleStartDate) {
+      routineDraft.cycleStartDate = todayISO();
+    }
+    if (!routineDraft.mesocycleWeeks) routineDraft.cycleStartDate = null;
     db.saveRoutine(routineDraft);
     routineDraft = null;
     renderRoutines();
@@ -618,7 +880,7 @@ function renderStrengthProgress() {
         .forEach((ex) => {
           let best = null;
           ex.sets.forEach((s) => {
-            if (s.weight == null) return;
+            if (s.weight == null || s.isWarmup) return;
             const oneRM = epley1RM(s.weight, s.reps || 1);
             if (!best || oneRM > best.oneRM) best = { oneRM, weight: s.weight, reps: s.reps };
           });

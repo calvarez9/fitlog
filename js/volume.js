@@ -29,12 +29,13 @@ export function computeVolume(workouts, { start, end }) {
 
   workouts
     .filter((w) => {
+      if (w.type === "cardio") return false; // cardio doesn't feed muscle/movement volume
       const d = new Date(w.date);
       return d >= start && d <= end;
     })
     .forEach((w) => {
       w.exercises.forEach((ex) => {
-        const setCount = ex.sets.length;
+        const setCount = ex.sets.filter((s) => !s.isWarmup).length;
         if (!setCount) return;
         const meta = getExerciseMeta(ex.exerciseName);
         movementTotals[meta.movement] = (movementTotals[meta.movement] || 0) + setCount;
