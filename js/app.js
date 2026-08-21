@@ -356,6 +356,7 @@ function resetLogForm() {
   currentCardio = { segments: [] };
   workoutStartedAt = null;
   $("#workoutName").value = "";
+  $("#workoutNotes").value = "";
   renderExerciseList();
   renderCardioList();
   $("#workoutDate").textContent = fmtDate(new Date());
@@ -419,6 +420,7 @@ function initLogView() {
 
   $("#finishWorkoutBtn").addEventListener("click", () => {
     const name = $("#workoutName").value.trim() || (logSubTab === "cardio" ? "Cardio" : "Workout");
+    const notes = $("#workoutNotes").value.trim();
     const finishedAt = todayISO();
     // durationMin is only meaningful when we actually saw the session start
     // (markWorkoutStarted() fires on the first exercise/cardio add) --
@@ -446,6 +448,7 @@ function initLogView() {
         startedAt: workoutStartedAt,
         durationMin,
         name,
+        notes,
         exercises: loggedExercises,
       });
     } else {
@@ -460,6 +463,7 @@ function initLogView() {
         startedAt: workoutStartedAt,
         durationMin,
         name,
+        notes,
         segments: loggedSegments,
       });
     }
@@ -652,6 +656,7 @@ function renderHistory() {
       <div class="history-card-summary">${workoutSummary(w)}</div>
       <div class="history-card-detail">
         ${detailHtml}
+        ${w.notes ? `<div class="history-card-notes">"${escapeHtml(w.notes)}"</div>` : ""}
         <div class="history-card-actions">
           <button class="btn secondary small dup-btn" data-id="${w.id}">Repeat</button>
           <button class="btn danger small del-btn" data-id="${w.id}">Delete</button>
