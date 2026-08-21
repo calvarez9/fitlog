@@ -14,10 +14,12 @@ const BACK_VIEWBOX = "724 0 724 1448";
 const FRONT_SLUG_TO_MUSCLES = {
   chest: ["chest"],
   abs: ["abs"],
+  obliques: ["obliques"],
   biceps: ["biceps"],
   triceps: ["triceps"],
   trapezius: ["traps"],
   deltoids: ["frontDelts", "middleDelts"],
+  adductors: ["adductors"],
   quadriceps: ["quadriceps"],
   calves: ["calves"],
   forearm: ["forearms"],
@@ -30,7 +32,8 @@ const BACK_SLUG_TO_MUSCLES = {
   triceps: ["triceps"],
   "lower-back": ["lowerBack"],
   forearm: ["forearms"],
-  gluteal: ["glutes"],
+  gluteal: ["glutes", "abductors"],
+  adductors: ["adductors"],
   hamstring: ["hamstrings"],
   calves: ["calves"],
 };
