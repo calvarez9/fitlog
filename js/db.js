@@ -62,22 +62,22 @@ export function getExercises() {
   return all.sort((a, b) => a.localeCompare(b));
 }
 
-// Full { name, movement, muscles, isCustom, isOverride } for every known exercise.
+// Full { name, movement, muscles, athleticism, isCustom, isOverride } for every known exercise.
 export function getAllExerciseObjects() {
   const customByName = new Map(getCustomExerciseObjects().map((e) => [e.name, e]));
   const names = getExercises();
   return names.map((name) => {
     const custom = customByName.get(name);
     const builtin = BUILTIN_EXERCISES[name];
-    if (custom) return { name, movement: custom.movement, muscles: custom.muscles, isCustom: !builtin, isOverride: !!builtin };
-    return { name, movement: builtin.movement, muscles: builtin.muscles, isCustom: false, isOverride: false };
+    if (custom) return { name, movement: custom.movement, muscles: custom.muscles, athleticism: custom.athleticism || 0, isCustom: !builtin, isOverride: !!builtin };
+    return { name, movement: builtin.movement, muscles: builtin.muscles, athleticism: builtin.athleticism || 0, isCustom: false, isOverride: false };
   });
 }
 
 // Metadata for a single exercise name, with graceful fallback for unknown names.
 export function getExerciseMeta(name) {
   const custom = getCustomExerciseObjects().find((e) => e.name === name);
-  if (custom) return { movement: custom.movement, muscles: custom.muscles };
+  if (custom) return { movement: custom.movement, muscles: custom.muscles, athleticism: custom.athleticism || 0 };
   if (BUILTIN_EXERCISES[name]) return BUILTIN_EXERCISES[name];
   return EMPTY_META;
 }
@@ -92,15 +92,15 @@ export function addCustomExercise(name) {
   write(KEYS.exercises, custom);
 }
 
-// Full add/edit from the Exercise Library: name + movement + muscles.
+// Full add/edit from the Exercise Library: name + movement + muscles + athleticism.
 // Saving under a name that matches a builtin creates an override.
-export function saveCustomExercise({ name, movement, muscles }, originalName = null) {
+export function saveCustomExercise({ name, movement, muscles, athleticism }, originalName = null) {
   name = name.trim();
   if (!name) throw new Error("Name required");
   const all = read(KEYS.exercises, []).map(normalizeCustom);
   const targetName = originalName || name;
   const idx = all.findIndex((e) => e.name === targetName);
-  const entry = { name, movement, muscles };
+  const entry = { name, movement, muscles, athleticism: athleticism || 0 };
   if (idx >= 0) all[idx] = entry;
   else all.push(entry);
   write(KEYS.exercises, all);

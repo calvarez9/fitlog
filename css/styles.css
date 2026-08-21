@@ -479,6 +479,7 @@ input::placeholder { color: var(--text-muted); }
 }
 .tag.movement { background: var(--series-1); color: #fff; }
 .tag.deload { background: var(--warning); color: #1a1a19; }
+.tag.athleticism { background: var(--series-2); color: #fff; text-transform: none; }
 .library-row-chevron { color: var(--text-muted); font-size: 18px; }
 
 .library-form { display: flex; flex-direction: column; gap: 14px; }

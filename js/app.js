@@ -1028,6 +1028,7 @@ function renderLibrary() {
       const secondary = MUSCLES.filter((m) => (ex.muscles || {})[m.key] === 0.5).map((m) => m.label);
       const tags = [
         `<span class="tag movement">${escapeHtml(movementTagLabel(ex.movement))}</span>`,
+        ...(ex.athleticism ? [`<span class="tag athleticism">⚡ ${ex.athleticism}</span>`] : []),
         ...primary.map((m) => `<span class="tag">${escapeHtml(m)}</span>`),
         ...secondary.map((m) => `<span class="tag">${escapeHtml(m)}·½</span>`),
       ].join("");
@@ -1065,15 +1066,18 @@ function openExerciseForm(name = null) {
 
   let movement = "isolation";
   let muscles = {};
+  let athleticism = 0;
   if (!isNew) {
     const meta = db.getExerciseMeta(name);
     movement = meta.movement;
     muscles = meta.muscles || {};
+    athleticism = meta.athleticism || 0;
   }
 
   $("#exerciseFormTitle").textContent = isNew ? "Add Exercise" : "Edit Exercise";
   $("#exerciseFormName").value = isNew ? "" : name;
   $("#exerciseFormMovement").value = movement;
+  $("#exerciseFormAthleticism").value = athleticism || "";
 
   const primaryKeys = Object.keys(muscles).filter((k) => muscles[k] === 1);
   const secondaryKeys = Object.keys(muscles).filter((k) => muscles[k] === 0.5);
@@ -1111,6 +1115,7 @@ function initLibraryView() {
       return;
     }
     const movement = $("#exerciseFormMovement").value;
+    const athleticism = parseFloat($("#exerciseFormAthleticism").value) || 0;
     const muscles = {};
     $$('input[data-muscle][data-group="primary"]').forEach((cb) => {
       if (cb.checked) muscles[cb.dataset.muscle] = 1;
@@ -1118,7 +1123,7 @@ function initLibraryView() {
     $$('input[data-muscle][data-group="secondary"]').forEach((cb) => {
       if (cb.checked && muscles[cb.dataset.muscle] !== 1) muscles[cb.dataset.muscle] = 0.5;
     });
-    db.saveCustomExercise({ name, movement, muscles }, exerciseFormState.originalName);
+    db.saveCustomExercise({ name, movement, muscles, athleticism }, exerciseFormState.originalName);
     toast("Exercise saved ✓");
     refreshExerciseDatalist();
     switchView("library");
