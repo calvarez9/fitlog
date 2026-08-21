@@ -67,6 +67,16 @@ function switchView(view) {
 
 // ==================== LOG VIEW ====================
 let currentWorkout = { exercises: [] }; // in-memory draft
+// Set on the first exercise/cardio activity added after a reset, so a saved
+// workout carries both a start and finish time (finish = todayISO() at save).
+// Lets anything cross-referencing against Garmin activity times (e.g. the
+// dashboard's workout linking) compute a real overlap instead of guessing
+// from a single point in time.
+let workoutStartedAt = null;
+
+function markWorkoutStarted() {
+  if (!workoutStartedAt) workoutStartedAt = new Date().toISOString();
+}
 
 function refreshExerciseDatalist() {
   const dl = $("#exerciseOptions");
@@ -88,6 +98,7 @@ function escapeHtml(s) {
 function addExerciseToWorkout(name, targetSets = 1, targetReps = null) {
   if (!name || !name.trim()) return;
   name = name.trim();
+  markWorkoutStarted();
   const sets = [];
   for (let i = 0; i < Math.max(1, targetSets); i++) {
     sets.push({ reps: targetReps || null, weight: null, rpe: null, done: false });
@@ -278,6 +289,7 @@ function refreshCardioDatalist() {
 
 function addCardioActivity(type) {
   if (!type || !type.trim()) return;
+  markWorkoutStarted();
   currentCardio.segments.push({
     activityType: type.trim(),
     durationMin: null,
@@ -342,6 +354,7 @@ function renderCardioList() {
 function resetLogForm() {
   currentWorkout = { exercises: [] };
   currentCardio = { segments: [] };
+  workoutStartedAt = null;
   $("#workoutName").value = "";
   renderExerciseList();
   renderCardioList();
@@ -406,6 +419,13 @@ function initLogView() {
 
   $("#finishWorkoutBtn").addEventListener("click", () => {
     const name = $("#workoutName").value.trim() || (logSubTab === "cardio" ? "Cardio" : "Workout");
+    const finishedAt = todayISO();
+    // durationMin is only meaningful when we actually saw the session start
+    // (markWorkoutStarted() fires on the first exercise/cardio add) --
+    // absent for any workout logged before this field existed.
+    const durationMin = workoutStartedAt
+      ? Math.round(((new Date(finishedAt) - new Date(workoutStartedAt)) / 60000) * 10) / 10
+      : null;
 
     if (logSubTab === "strength") {
       const loggedExercises = currentWorkout.exercises
@@ -420,14 +440,28 @@ function initLogView() {
         toast("Add at least one set before saving");
         return;
       }
-      db.saveWorkout({ type: "strength", date: todayISO(), name, exercises: loggedExercises });
+      db.saveWorkout({
+        type: "strength",
+        date: finishedAt,
+        startedAt: workoutStartedAt,
+        durationMin,
+        name,
+        exercises: loggedExercises,
+      });
     } else {
       const loggedSegments = currentCardio.segments.filter((s) => s.durationMin != null || s.distance != null);
       if (loggedSegments.length === 0) {
         toast("Add a duration or distance before saving");
         return;
       }
-      db.saveWorkout({ type: "cardio", date: todayISO(), name, segments: loggedSegments });
+      db.saveWorkout({
+        type: "cardio",
+        date: finishedAt,
+        startedAt: workoutStartedAt,
+        durationMin,
+        name,
+        segments: loggedSegments,
+      });
     }
 
     toast("Workout saved ✓");
@@ -647,6 +681,7 @@ function renderHistory() {
       const w = db.getWorkout(btn.dataset.id);
       if (!w) return;
       $("#workoutName").value = w.name;
+      markWorkoutStarted();
       if (isCardio(w)) {
         currentCardio = { segments: w.segments.map((s) => ({ ...s })) };
         renderCardioList();
