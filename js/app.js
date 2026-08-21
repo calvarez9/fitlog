@@ -31,6 +31,25 @@ function epley1RM(weight, reps) {
   return weight * (1 + reps / 30);
 }
 
+// Best-ever set for an exercise (by est. 1RM), from already-saved workouts
+// only -- the workout currently being logged isn't saved yet, so this
+// naturally only ever shows real history, never today's own numbers.
+function bestSetFor(exerciseName) {
+  let best = null;
+  db.getWorkouts().forEach((w) => {
+    if (w.type === "cardio") return;
+    w.exercises.forEach((ex) => {
+      if (ex.exerciseName !== exerciseName) return;
+      ex.sets.forEach((s) => {
+        if (s.weight == null || s.isWarmup) return;
+        const oneRM = epley1RM(s.weight, s.reps || 1);
+        if (!best || oneRM > best.oneRM) best = { oneRM, weight: s.weight, reps: s.reps };
+      });
+    });
+  });
+  return best;
+}
+
 // "7:42 /mi" style pace string from minutes + distance, or null if either is missing/zero.
 function formatPace(durationMin, distance, unit) {
   if (!durationMin || !distance) return null;
@@ -161,6 +180,7 @@ function renderExerciseList() {
     group.indices.forEach((exIdx) => {
       const ex = currentWorkout.exercises[exIdx];
       const hasNext = exIdx < currentWorkout.exercises.length - 1;
+      const best = bestSetFor(ex.exerciseName);
       const card = document.createElement("div");
       card.className = "exercise-card";
       card.innerHTML = `
@@ -172,6 +192,7 @@ function renderExerciseList() {
             <button class="remove-exercise" data-ex="${exIdx}">Remove</button>
           </div>
         </div>
+        ${best ? `<p class="exercise-best-lift muted small">Best: ${best.weight}${unit} × ${best.reps}</p>` : ""}
         <div class="set-row-labels">
           <span>#</span><span>Weight (${unit})</span><span>Reps</span><span>RPE</span><span>✓</span>
         </div>
@@ -966,7 +987,13 @@ function renderVolumeProgress() {
   $("#weekLabel").textContent = label;
   $("#weekNextBtn").disabled = weekOffset >= 0;
 
-  const { muscleRows, movementRows, muscleTotals } = computeVolume(db.getWorkouts(), { start, end });
+  const { muscleRows, movementRows, muscleTotals, strengthSets, athleticismScore, cardioMinutes } = computeVolume(db.getWorkouts(), { start, end });
+
+  $("#emphasisCards").innerHTML = `
+    <div class="pr-card"><div class="pr-label">Strength</div><div class="pr-value">${strengthSets}</div><div class="pr-sub">working sets</div></div>
+    <div class="pr-card"><div class="pr-label">Athleticism</div><div class="pr-value">${athleticismScore}</div><div class="pr-sub">weighted score</div></div>
+    <div class="pr-card"><div class="pr-label">Cardio</div><div class="pr-value">${Math.round(cardioMinutes)}</div><div class="pr-sub">minutes</div></div>
+  `;
 
   applyVolumeColors($("#bodyFront"), $("#bodyBack"), muscleTotals);
 

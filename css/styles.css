@@ -194,6 +194,7 @@ input::placeholder { color: var(--text-muted); }
   gap: 8px;
 }
 .exercise-card-header h3 { margin: 0; font-size: 16px; min-width: 0; overflow-wrap: break-word; }
+.exercise-best-lift { margin: -6px 0 10px; }
 .exercise-card-actions { display: flex; align-items: center; gap: 10px; flex: none; }
 .exercise-card-actions button {
   background: none; border: none; color: var(--text-muted); font-size: 13px; cursor: pointer; padding: 0;

@@ -22,22 +22,36 @@ export function getWeekRange(offset = 0) {
 }
 
 // workouts: array from db.getWorkouts(). Returns sets-per-muscle and sets-per-movement
-// for workouts whose date falls within [start, end].
+// for workouts whose date falls within [start, end], plus a Strength/
+// Athleticism/Cardio breakdown for the same range (three numbers in their
+// own native units -- sets / weighted score / minutes -- same reasoning
+// as the dashboard's Training Emphasis: forcing them onto one shared
+// scale would be more misleading than honest).
 export function computeVolume(workouts, { start, end }) {
   const muscleTotals = Object.fromEntries(MUSCLES.map((m) => [m.key, 0]));
   const movementTotals = Object.fromEntries(MOVEMENTS.map((m) => [m.key, 0]));
+  let strengthSets = 0;
+  let athleticismScore = 0;
+  let cardioMinutes = 0;
 
   workouts
     .filter((w) => {
-      if (w.type === "cardio") return false; // cardio doesn't feed muscle/movement volume
       const d = new Date(w.date);
       return d >= start && d <= end;
     })
     .forEach((w) => {
+      if (w.type === "cardio") {
+        (w.segments || []).forEach((seg) => {
+          cardioMinutes += seg.durationMin || 0;
+        });
+        return;
+      }
       w.exercises.forEach((ex) => {
         const setCount = ex.sets.filter((s) => !s.isWarmup).length;
         if (!setCount) return;
+        strengthSets += setCount;
         const meta = getExerciseMeta(ex.exerciseName);
+        athleticismScore += setCount * (meta.athleticism || 0);
         movementTotals[meta.movement] = (movementTotals[meta.movement] || 0) + setCount;
         Object.entries(meta.muscles || {}).forEach(([muscle, frac]) => {
           muscleTotals[muscle] = (muscleTotals[muscle] || 0) + setCount * frac;
@@ -53,7 +67,15 @@ export function computeVolume(workouts, { start, end }) {
     .filter((r) => r.sets > 0)
     .sort((a, b) => b.sets - a.sets);
 
-  return { muscleRows, movementRows, muscleTotals, movementTotals };
+  return {
+    muscleRows,
+    movementRows,
+    muscleTotals,
+    movementTotals,
+    strengthSets,
+    athleticismScore: round(athleticismScore),
+    cardioMinutes: Math.round(cardioMinutes),
+  };
 }
 
 function round(n) {
