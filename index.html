@@ -75,13 +75,53 @@
     <section id="view-progress" class="view" data-view="progress" hidden>
       <div class="view-header">
         <h2>Progress</h2>
-        <select id="progressExerciseSelect"></select>
+        <div class="segmented progress-subnav" id="progressSubnav">
+          <button data-sub="strength" class="seg-btn active">Strength</button>
+          <button data-sub="volume" class="seg-btn">Volume</button>
+        </div>
       </div>
-      <div id="prCards" class="pr-cards"></div>
-      <div id="progressChartWrap" class="chart-wrap">
-        <svg id="progressChart" viewBox="0 0 600 260" preserveAspectRatio="xMidYMid meet"></svg>
+
+      <div id="progressStrength" class="progress-pane">
+        <select id="progressExerciseSelect" style="margin-bottom:16px"></select>
+        <div id="prCards" class="pr-cards"></div>
+        <div id="progressChartWrap" class="chart-wrap">
+          <svg id="progressChart" viewBox="0 0 600 260" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+        <p id="progressEmpty" class="empty-state" hidden>Log a few workouts with this exercise to see your trend.</p>
       </div>
-      <p id="progressEmpty" class="empty-state" hidden>Log a few workouts with this exercise to see your trend.</p>
+
+      <div id="progressVolume" class="progress-pane" hidden>
+        <div class="week-nav">
+          <button id="weekPrevBtn" class="week-nav-btn" aria-label="Previous week">‹</button>
+          <span class="week-nav-label" id="weekLabel"></span>
+          <button id="weekNextBtn" class="week-nav-btn" aria-label="Next week">›</button>
+        </div>
+
+        <div class="bodymap-card">
+          <div class="bodymap-row">
+            <figure class="bodymap-figure">
+              <svg id="bodyFront"></svg>
+              <figcaption>Front</figcaption>
+            </figure>
+            <figure class="bodymap-figure">
+              <svg id="bodyBack"></svg>
+              <figcaption>Back</figcaption>
+            </figure>
+          </div>
+        </div>
+
+        <div class="volume-section">
+          <h3 class="volume-section-title">Muscle Engagement</h3>
+          <div id="muscleBarList" class="volume-bar-list"></div>
+        </div>
+
+        <div class="volume-section">
+          <h3 class="volume-section-title">Movement Patterns</h3>
+          <div id="movementBarList" class="volume-bar-list"></div>
+        </div>
+
+        <p id="volumeEmpty" class="empty-state" hidden>No sets logged this week yet.</p>
+      </div>
     </section>
 
     <!-- SETTINGS VIEW -->
@@ -107,6 +147,12 @@
       </div>
 
       <div class="settings-group">
+        <h3>Exercise Library</h3>
+        <p class="muted small">Manage exercises and the muscles/movement pattern each one trains — this feeds the Progress → Volume view.</p>
+        <button id="openLibraryBtn" class="btn secondary">Manage Exercises</button>
+      </div>
+
+      <div class="settings-group">
         <h3>Backup</h3>
         <p class="muted small">Your data lives only on this device. Export regularly so you don't lose it.</p>
         <div class="row">
@@ -123,6 +169,46 @@
       </div>
 
       <p class="muted small version">FitLog · local-first · v1.0</p>
+    </section>
+
+    <!-- EXERCISE LIBRARY VIEW (reached from Settings, not a tab) -->
+    <section id="view-library" class="view" data-view="library" hidden>
+      <button class="back-link" id="libraryBackBtn">‹ Settings</button>
+      <div class="view-header">
+        <h2>Exercise Library</h2>
+        <button id="newExerciseBtn" class="btn secondary">+ Add Exercise</button>
+      </div>
+      <div id="libraryList" class="library-list"></div>
+    </section>
+
+    <!-- EXERCISE EDIT/ADD FORM VIEW -->
+    <section id="view-exercise-form" class="view" data-view="exercise-form" hidden>
+      <button class="back-link" id="exerciseFormBackBtn">‹ Exercise Library</button>
+      <div class="view-header">
+        <h2 id="exerciseFormTitle">Add Exercise</h2>
+      </div>
+      <div class="library-form">
+        <div>
+          <div class="field-label">Name</div>
+          <input type="text" id="exerciseFormName" placeholder="e.g. Cable Crossover" />
+        </div>
+        <div>
+          <div class="field-label">Movement pattern</div>
+          <select id="exerciseFormMovement"></select>
+        </div>
+        <div>
+          <div class="field-label">Primary muscles (full credit)</div>
+          <div class="muscle-grid" id="exerciseFormPrimary"></div>
+        </div>
+        <div>
+          <div class="field-label">Secondary muscles (half credit)</div>
+          <div class="muscle-grid" id="exerciseFormSecondary"></div>
+        </div>
+        <div class="form-actions">
+          <button id="exerciseFormSaveBtn" class="btn primary">Save exercise</button>
+          <button id="exerciseFormDeleteBtn" class="btn danger" hidden>Delete</button>
+        </div>
+      </div>
     </section>
 
   </main>

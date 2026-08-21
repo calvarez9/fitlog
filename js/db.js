@@ -39,30 +39,78 @@ export function saveSettings(patch) {
 }
 
 // ---------- Exercises ----------
-const BUILTIN_EXERCISES = [
-  "Barbell Squat", "Bench Press", "Deadlift", "Overhead Press", "Barbell Row",
-  "Pull-Up", "Chin-Up", "Push-Up", "Dip", "Lat Pulldown", "Seated Cable Row",
-  "Incline Bench Press", "Dumbbell Bench Press", "Dumbbell Shoulder Press",
-  "Dumbbell Row", "Dumbbell Curl", "Barbell Curl", "Hammer Curl",
-  "Tricep Pushdown", "Skull Crusher", "Leg Press", "Leg Curl", "Leg Extension",
-  "Romanian Deadlift", "Hip Thrust", "Walking Lunge", "Bulgarian Split Squat",
-  "Calf Raise", "Plank", "Hanging Leg Raise", "Cable Fly", "Face Pull",
-  "Lateral Raise", "Front Raise", "Shrug", "Good Morning", "Farmer's Carry",
-];
+// Custom exercises (and overrides of builtins) are stored as an array of
+// { name, movement, muscles: {muscleKey: fraction} }. A legacy install may
+// still have plain strings here from before metadata existed — normalized
+// to a minimal object on read.
+import { BUILTIN_EXERCISES, EMPTY_META } from "./exerciseLibrary.js";
 
+function normalizeCustom(entry) {
+  if (typeof entry === "string") return { name: entry, ...EMPTY_META, muscles: {} };
+  return entry;
+}
+
+export function getCustomExerciseObjects() {
+  return read(KEYS.exercises, []).map(normalizeCustom);
+}
+
+// All exercise names (builtin + custom), for pickers/datalists.
 export function getExercises() {
-  const custom = read(KEYS.exercises, []);
-  const all = [...new Set([...BUILTIN_EXERCISES, ...custom])];
+  const custom = getCustomExerciseObjects().map((e) => e.name);
+  const all = [...new Set([...Object.keys(BUILTIN_EXERCISES), ...custom])];
   return all.sort((a, b) => a.localeCompare(b));
 }
 
+// Full { name, movement, muscles, isCustom, isOverride } for every known exercise.
+export function getAllExerciseObjects() {
+  const customByName = new Map(getCustomExerciseObjects().map((e) => [e.name, e]));
+  const names = getExercises();
+  return names.map((name) => {
+    const custom = customByName.get(name);
+    const builtin = BUILTIN_EXERCISES[name];
+    if (custom) return { name, movement: custom.movement, muscles: custom.muscles, isCustom: !builtin, isOverride: !!builtin };
+    return { name, movement: builtin.movement, muscles: builtin.muscles, isCustom: false, isOverride: false };
+  });
+}
+
+// Metadata for a single exercise name, with graceful fallback for unknown names.
+export function getExerciseMeta(name) {
+  const custom = getCustomExerciseObjects().find((e) => e.name === name);
+  if (custom) return { movement: custom.movement, muscles: custom.muscles };
+  if (BUILTIN_EXERCISES[name]) return BUILTIN_EXERCISES[name];
+  return EMPTY_META;
+}
+
+// Quick-add from the Log view: name only, no metadata yet.
 export function addCustomExercise(name) {
   name = name.trim();
   if (!name) return;
   if (getExercises().some((e) => e.toLowerCase() === name.toLowerCase())) return;
   const custom = read(KEYS.exercises, []);
-  custom.push(name);
+  custom.push({ name, ...EMPTY_META, muscles: {} });
   write(KEYS.exercises, custom);
+}
+
+// Full add/edit from the Exercise Library: name + movement + muscles.
+// Saving under a name that matches a builtin creates an override.
+export function saveCustomExercise({ name, movement, muscles }, originalName = null) {
+  name = name.trim();
+  if (!name) throw new Error("Name required");
+  const all = read(KEYS.exercises, []).map(normalizeCustom);
+  const targetName = originalName || name;
+  const idx = all.findIndex((e) => e.name === targetName);
+  const entry = { name, movement, muscles };
+  if (idx >= 0) all[idx] = entry;
+  else all.push(entry);
+  write(KEYS.exercises, all);
+  return entry;
+}
+
+// Deletes a custom exercise / override. If it was overriding a builtin,
+// this reverts it back to the builtin default (rather than losing it).
+export function deleteCustomExercise(name) {
+  const all = read(KEYS.exercises, []).map(normalizeCustom).filter((e) => e.name !== name);
+  write(KEYS.exercises, all);
 }
 
 // ---------- Workouts ----------

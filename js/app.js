@@ -1,6 +1,9 @@
 import * as db from "./db.js";
 import { initTimer } from "./timer.js";
 import { renderProgressChart } from "./charts.js";
+import { MUSCLES, MOVEMENTS, MOVEMENT_LABEL } from "./exerciseLibrary.js";
+import { getWeekRange, computeVolume } from "./volume.js";
+import { renderBodyMaps, applyVolumeColors } from "./bodyMap.js";
 
 // ==================== Helpers ====================
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -38,10 +41,12 @@ function initTabs() {
 
 function switchView(view) {
   $$(".view").forEach((v) => (v.hidden = v.dataset.view !== view));
-  $$(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === view));
+  const tabForView = view === "library" || view === "exercise-form" ? "settings" : view;
+  $$(".tab-btn").forEach((b) => b.classList.toggle("active", b.dataset.view === tabForView));
   if (view === "history") renderHistory();
   if (view === "routines") renderRoutines();
   if (view === "progress") renderProgress();
+  if (view === "library") renderLibrary();
   if (view === "log") {
     refreshExerciseDatalist();
     refreshRoutineQuickstart();
@@ -426,7 +431,15 @@ function initRoutinesView() {
 }
 
 // ==================== PROGRESS VIEW ====================
+let progressSubTab = "strength";
+let weekOffset = 0;
+
 function renderProgress() {
+  if (progressSubTab === "strength") renderStrengthProgress();
+  else renderVolumeProgress();
+}
+
+function renderStrengthProgress() {
   const select = $("#progressExerciseSelect");
   const workouts = db.getWorkouts();
   const exerciseNames = [...new Set(workouts.flatMap((w) => w.exercises.map((e) => e.exerciseName)))].sort();
@@ -497,8 +510,176 @@ function renderProgress() {
   renderProgressChart($("#progressChart"), points, { yLabel: unit + " (est. 1RM)" });
 }
 
+function renderVolumeProgress() {
+  const { start, end, label } = getWeekRange(weekOffset);
+  $("#weekLabel").textContent = label;
+  $("#weekNextBtn").disabled = weekOffset >= 0;
+
+  const { muscleRows, movementRows, muscleTotals } = computeVolume(db.getWorkouts(), { start, end });
+
+  applyVolumeColors($("#bodyFront"), $("#bodyBack"), muscleTotals);
+
+  const bar = (row, maxSets) => `
+    <div class="volume-bar-row">
+      <span class="volume-bar-label"><span class="volume-bar-dot"></span>${escapeHtml(row.label)}</span>
+      <span class="volume-bar-track"><span class="volume-bar-fill" style="width:${(row.sets / maxSets) * 100}%"></span></span>
+      <span class="volume-bar-value">${row.sets} set${row.sets === 1 ? "" : "s"}</span>
+    </div>`;
+
+  const maxMuscle = muscleRows[0]?.sets || 1;
+  $("#muscleBarList").innerHTML = muscleRows.map((r) => bar(r, maxMuscle)).join("");
+
+  const maxMovement = movementRows[0]?.sets || 1;
+  $("#movementBarList").innerHTML = movementRows.map((r) => bar(r, maxMovement)).join("");
+
+  $("#volumeEmpty").hidden = muscleRows.length > 0;
+}
+
 function initProgressView() {
   $("#progressExerciseSelect").addEventListener("change", renderProgress);
+
+  renderBodyMaps($("#bodyFront"), $("#bodyBack"));
+
+  $$(".seg-btn", $("#progressSubnav")).forEach((btn) => {
+    btn.addEventListener("click", () => {
+      progressSubTab = btn.dataset.sub;
+      $$(".seg-btn", $("#progressSubnav")).forEach((b) => b.classList.toggle("active", b === btn));
+      $("#progressStrength").hidden = progressSubTab !== "strength";
+      $("#progressVolume").hidden = progressSubTab !== "volume";
+      renderProgress();
+    });
+  });
+
+  $("#weekPrevBtn").addEventListener("click", () => {
+    weekOffset -= 1;
+    renderVolumeProgress();
+  });
+  $("#weekNextBtn").addEventListener("click", () => {
+    if (weekOffset >= 0) return;
+    weekOffset += 1;
+    renderVolumeProgress();
+  });
+}
+
+// ==================== EXERCISE LIBRARY ====================
+let exerciseFormState = { originalName: null };
+
+function movementTagLabel(key) {
+  return MOVEMENT_LABEL[key] || key;
+}
+
+function renderLibrary() {
+  const listEl = $("#libraryList");
+  const all = db.getAllExerciseObjects();
+  listEl.innerHTML = all
+    .map((ex) => {
+      const primary = MUSCLES.filter((m) => (ex.muscles || {})[m.key] === 1).map((m) => m.label);
+      const secondary = MUSCLES.filter((m) => (ex.muscles || {})[m.key] === 0.5).map((m) => m.label);
+      const tags = [
+        `<span class="tag movement">${escapeHtml(movementTagLabel(ex.movement))}</span>`,
+        ...primary.map((m) => `<span class="tag">${escapeHtml(m)}</span>`),
+        ...secondary.map((m) => `<span class="tag">${escapeHtml(m)}·½</span>`),
+      ].join("");
+      return `
+        <div class="library-row" data-name="${escapeHtml(ex.name)}">
+          <div class="library-row-main">
+            <h4>${escapeHtml(ex.name)}</h4>
+            <div class="library-row-tags">${tags}</div>
+          </div>
+          <span class="library-row-chevron">›</span>
+        </div>`;
+    })
+    .join("");
+
+  $$(".library-row", listEl).forEach((row) =>
+    row.addEventListener("click", () => openExerciseForm(row.dataset.name))
+  );
+}
+
+function muscleGridHtml(containerId, checkedKeys) {
+  return MUSCLES.map(
+    (m) => `
+    <label class="muscle-check">
+      <input type="checkbox" data-muscle="${m.key}" data-group="${containerId}" ${checkedKeys.includes(m.key) ? "checked" : ""}>
+      ${escapeHtml(m.label)}
+    </label>`
+  ).join("");
+}
+
+function openExerciseForm(name = null) {
+  const isNew = !name;
+  exerciseFormState = { originalName: name };
+
+  $("#exerciseFormMovement").innerHTML = MOVEMENTS.map((m) => `<option value="${m.key}">${escapeHtml(m.label)}</option>`).join("");
+
+  let movement = "isolation";
+  let muscles = {};
+  if (!isNew) {
+    const meta = db.getExerciseMeta(name);
+    movement = meta.movement;
+    muscles = meta.muscles || {};
+  }
+
+  $("#exerciseFormTitle").textContent = isNew ? "Add Exercise" : "Edit Exercise";
+  $("#exerciseFormName").value = isNew ? "" : name;
+  $("#exerciseFormMovement").value = movement;
+
+  const primaryKeys = Object.keys(muscles).filter((k) => muscles[k] === 1);
+  const secondaryKeys = Object.keys(muscles).filter((k) => muscles[k] === 0.5);
+  $("#exerciseFormPrimary").innerHTML = muscleGridHtml("primary", primaryKeys);
+  $("#exerciseFormSecondary").innerHTML = muscleGridHtml("secondary", secondaryKeys);
+
+  // keep primary/secondary mutually exclusive
+  $$("input[data-muscle]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      if (!cb.checked) return;
+      const other = cb.dataset.group === "primary" ? "secondary" : "primary";
+      const twin = $(`input[data-muscle="${cb.dataset.muscle}"][data-group="${other}"]`);
+      if (twin) twin.checked = false;
+    });
+  });
+
+  const all = db.getAllExerciseObjects();
+  const existing = all.find((e) => e.name === name);
+  const canDelete = !isNew && existing && (existing.isCustom || existing.isOverride);
+  $("#exerciseFormDeleteBtn").hidden = !canDelete;
+
+  switchView("exercise-form");
+}
+
+function initLibraryView() {
+  $("#openLibraryBtn").addEventListener("click", () => switchView("library"));
+  $("#libraryBackBtn").addEventListener("click", () => switchView("settings"));
+  $("#exerciseFormBackBtn").addEventListener("click", () => switchView("library"));
+  $("#newExerciseBtn").addEventListener("click", () => openExerciseForm(null));
+
+  $("#exerciseFormSaveBtn").addEventListener("click", () => {
+    const name = $("#exerciseFormName").value.trim();
+    if (!name) {
+      toast("Name is required");
+      return;
+    }
+    const movement = $("#exerciseFormMovement").value;
+    const muscles = {};
+    $$('input[data-muscle][data-group="primary"]').forEach((cb) => {
+      if (cb.checked) muscles[cb.dataset.muscle] = 1;
+    });
+    $$('input[data-muscle][data-group="secondary"]').forEach((cb) => {
+      if (cb.checked && muscles[cb.dataset.muscle] !== 1) muscles[cb.dataset.muscle] = 0.5;
+    });
+    db.saveCustomExercise({ name, movement, muscles }, exerciseFormState.originalName);
+    toast("Exercise saved ✓");
+    refreshExerciseDatalist();
+    switchView("library");
+  });
+
+  $("#exerciseFormDeleteBtn").addEventListener("click", () => {
+    if (!confirm(`Remove "${exerciseFormState.originalName}" from your library? Past workouts keep the name either way.`)) return;
+    db.deleteCustomExercise(exerciseFormState.originalName);
+    toast("Exercise removed");
+    refreshExerciseDatalist();
+    switchView("library");
+  });
 }
 
 // ==================== SETTINGS VIEW ====================
@@ -602,6 +783,7 @@ function init() {
   initHistoryView();
   initRoutinesView();
   initProgressView();
+  initLibraryView();
   initSettingsView();
   initRestTimer();
 

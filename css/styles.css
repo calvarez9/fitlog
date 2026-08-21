@@ -306,6 +306,110 @@ input::placeholder { color: var(--text-muted); }
 #progressChart .tooltip-bg { fill: var(--surface-3); stroke: var(--border); }
 #progressChart .tooltip-text { fill: var(--text-primary); font-weight: 600; }
 
+/* ---------- Progress sub-nav ---------- */
+.progress-subnav { margin-bottom: 16px; }
+
+/* ---------- Volume: week nav ---------- */
+.week-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.week-nav-label { font-weight: 700; font-size: 14px; min-width: 128px; text-align: center; }
+.week-nav-btn {
+  border: 1px solid var(--border);
+  background: var(--surface-1);
+  color: var(--text-primary);
+  width: 32px; height: 32px;
+  border-radius: 999px;
+  font-size: 16px;
+  cursor: pointer;
+}
+.week-nav-btn:disabled { opacity: 0.35; cursor: default; }
+
+/* ---------- Volume: body map ---------- */
+.bodymap-card {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  padding: 14px 8px;
+  margin-bottom: 16px;
+}
+.bodymap-row { display: flex; justify-content: center; gap: 18px; }
+.bodymap-figure { flex: 1; max-width: 150px; text-align: center; }
+.bodymap-figure svg { width: 100%; height: auto; display: block; }
+.bodymap-figure figcaption {
+  font-size: 11px;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-top: 6px;
+  font-weight: 600;
+}
+.bm-neutral { fill: var(--surface-3); stroke: var(--border); stroke-width: 1; }
+.bm-region { stroke: var(--border); stroke-width: 1; }
+.bm-region.bm-zero { fill: var(--surface-3); }
+.bm-region.bm-active { fill: var(--series-2); fill-opacity: var(--bm-opacity, 0.3); }
+
+/* ---------- Volume: bar lists ---------- */
+.volume-section { margin-bottom: 18px; }
+.volume-section-title {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-muted);
+  margin: 0 0 8px 2px;
+}
+.volume-bar-list { display: flex; flex-direction: column; gap: 10px; }
+.volume-bar-row { display: grid; grid-template-columns: 100px 1fr 52px; align-items: center; gap: 10px; }
+.volume-bar-label { font-size: 13px; color: var(--text-primary); display: flex; align-items: center; gap: 7px; }
+.volume-bar-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--series-2); flex: none; }
+.volume-bar-track { background: var(--surface-3); border-radius: 999px; height: 8px; overflow: hidden; }
+.volume-bar-fill { display: block; background: var(--series-2); height: 100%; border-radius: 999px; }
+.volume-bar-value { font-size: 12px; color: var(--text-secondary); text-align: right; font-variant-numeric: tabular-nums; }
+
+/* ---------- Exercise Library ---------- */
+.library-list { display: flex; flex-direction: column; gap: 8px; }
+.library-row {
+  background: var(--surface-1);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-m);
+  padding: 12px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  cursor: pointer;
+}
+.library-row-main h4 { margin: 0 0 3px; font-size: 14px; }
+.library-row-tags { display: flex; gap: 5px; flex-wrap: wrap; }
+.tag {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface-3);
+  color: var(--text-secondary);
+}
+.tag.movement { background: var(--series-1); color: #fff; }
+.library-row-chevron { color: var(--text-muted); font-size: 18px; }
+
+.library-form { display: flex; flex-direction: column; gap: 14px; }
+.muscle-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 12px; }
+.muscle-check { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.muscle-check input { width: 16px; height: 16px; }
+.form-actions { display: flex; gap: 8px; margin-top: 4px; }
+.back-link {
+  background: none; border: none; color: var(--series-1);
+  font-size: 14px; font-weight: 600; padding: 0; cursor: pointer;
+  display: flex; align-items: center; gap: 4px; margin-bottom: 4px;
+}
+
 /* ---------- Settings ---------- */
 .settings-group {
   background: var(--surface-1);
