@@ -5,6 +5,7 @@ const KEYS = {
   workouts: "fitlog_workouts",
   routines: "fitlog_routines",
   exercises: "fitlog_custom_exercises",
+  cardioTypes: "fitlog_custom_cardio_types",
   settings: "fitlog_settings",
 };
 
@@ -27,7 +28,7 @@ function uid() {
 }
 
 // ---------- Settings ----------
-const DEFAULT_SETTINGS = { unit: "lb", restTimerDefault: 90 };
+const DEFAULT_SETTINGS = { unit: "lb", restTimerDefault: 90, distanceUnit: "mi" };
 
 export function getSettings() {
   return { ...DEFAULT_SETTINGS, ...read(KEYS.settings, {}) };
@@ -113,6 +114,25 @@ export function deleteCustomExercise(name) {
   write(KEYS.exercises, all);
 }
 
+// ---------- Cardio activity types ----------
+import { BUILTIN_CARDIO_TYPES } from "./cardioLibrary.js";
+
+export function getCardioTypes() {
+  const custom = read(KEYS.cardioTypes, []);
+  const all = [...new Set([...BUILTIN_CARDIO_TYPES, ...custom])];
+  // Keep "Other" last rather than alphabetizing it away from the end.
+  return [...all.filter((t) => t !== "Other").sort((a, b) => a.localeCompare(b)), "Other"];
+}
+
+export function addCustomCardioType(name) {
+  name = name.trim();
+  if (!name) return;
+  if (getCardioTypes().some((t) => t.toLowerCase() === name.toLowerCase())) return;
+  const custom = read(KEYS.cardioTypes, []);
+  custom.push(name);
+  write(KEYS.cardioTypes, custom);
+}
+
 // ---------- Workouts ----------
 export function getWorkouts() {
   return read(KEYS.workouts, []).sort((a, b) => new Date(b.date) - new Date(a.date));
@@ -165,6 +185,7 @@ export function exportAll() {
     workouts: read(KEYS.workouts, []),
     routines: read(KEYS.routines, []),
     exercises: read(KEYS.exercises, []),
+    cardioTypes: read(KEYS.cardioTypes, []),
     settings: read(KEYS.settings, {}),
   };
 }
@@ -174,6 +195,7 @@ export function importAll(data) {
   if (Array.isArray(data.workouts)) write(KEYS.workouts, data.workouts);
   if (Array.isArray(data.routines)) write(KEYS.routines, data.routines);
   if (Array.isArray(data.exercises)) write(KEYS.exercises, data.exercises);
+  if (Array.isArray(data.cardioTypes)) write(KEYS.cardioTypes, data.cardioTypes);
   if (data.settings && typeof data.settings === "object") write(KEYS.settings, data.settings);
 }
 

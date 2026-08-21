@@ -26,26 +26,42 @@
     <section id="view-log" class="view" data-view="log">
       <div class="view-header">
         <h2>Log Workout</h2>
+        <div class="segmented" id="logSubnav">
+          <button data-sub="strength" class="seg-btn active">Strength</button>
+          <button data-sub="cardio" class="seg-btn">Cardio</button>
+        </div>
         <div class="workout-meta">
           <input id="workoutName" type="text" placeholder="Workout name (optional)" />
           <span id="workoutDate" class="muted"></span>
         </div>
       </div>
 
-      <div class="routine-quickstart" id="routineQuickstart" hidden>
-        <label for="routineSelect" class="field-label">Start from routine</label>
-        <div class="row">
-          <select id="routineSelect"></select>
-          <button id="loadRoutineBtn" class="btn secondary">Load</button>
+      <div id="logStrength" class="log-pane">
+        <div class="routine-quickstart" id="routineQuickstart" hidden>
+          <label for="routineSelect" class="field-label">Start from routine</label>
+          <div class="row">
+            <select id="routineSelect"></select>
+            <button id="loadRoutineBtn" class="btn secondary">Load</button>
+          </div>
+        </div>
+
+        <div id="exerciseList" class="exercise-list"></div>
+
+        <div class="add-exercise-row">
+          <input id="exercisePicker" list="exerciseOptions" placeholder="Add exercise…" autocomplete="off" />
+          <datalist id="exerciseOptions"></datalist>
+          <button id="addExerciseBtn" class="btn secondary">+ Add</button>
         </div>
       </div>
 
-      <div id="exerciseList" class="exercise-list"></div>
+      <div id="logCardio" class="log-pane" hidden>
+        <div id="cardioList" class="exercise-list"></div>
 
-      <div class="add-exercise-row">
-        <input id="exercisePicker" list="exerciseOptions" placeholder="Add exercise…" autocomplete="off" />
-        <datalist id="exerciseOptions"></datalist>
-        <button id="addExerciseBtn" class="btn secondary">+ Add</button>
+        <div class="add-exercise-row">
+          <input id="cardioTypePicker" list="cardioOptions" placeholder="Add activity…" autocomplete="off" />
+          <datalist id="cardioOptions"></datalist>
+          <button id="addCardioBtn" class="btn secondary">+ Add</button>
+        </div>
       </div>
 
       <button id="finishWorkoutBtn" class="btn primary block">Finish &amp; Save Workout</button>
@@ -131,10 +147,18 @@
       </div>
 
       <div class="settings-group">
-        <h3>Units</h3>
+        <h3>Weight Unit</h3>
         <div class="segmented" id="unitSegmented">
           <button data-unit="lb" class="seg-btn active">lb</button>
           <button data-unit="kg" class="seg-btn">kg</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3>Distance Unit</h3>
+        <div class="segmented" id="distanceUnitSegmented">
+          <button data-unit="mi" class="seg-btn active">mi</button>
+          <button data-unit="km" class="seg-btn">km</button>
         </div>
       </div>
 

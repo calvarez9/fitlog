@@ -237,6 +237,20 @@ input::placeholder { color: var(--text-muted); }
 .add-exercise-row { display: flex; gap: 8px; margin-top: 16px; }
 .add-exercise-row input { flex: 1; }
 
+/* ---------- Log sub-nav / cardio ---------- */
+.log-pane { margin-top: 4px; }
+.cardio-field-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.cardio-field-grid.thirds { grid-template-columns: 1fr 1fr 1fr; }
+.cardio-field { display: flex; flex-direction: column; gap: 4px; }
+.cardio-field label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.cardio-field input { text-align: left; }
+.cardio-card .exercise-card-header { margin-bottom: 12px; }
+
 /* ---------- History ---------- */
 .history-list { display: flex; flex-direction: column; gap: 10px; }
 .history-card {

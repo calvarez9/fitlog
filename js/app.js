@@ -49,6 +49,7 @@ function switchView(view) {
   if (view === "library") renderLibrary();
   if (view === "log") {
     refreshExerciseDatalist();
+    refreshCardioDatalist();
     refreshRoutineQuickstart();
   }
 }
@@ -148,15 +149,110 @@ function renderExerciseList() {
   );
 }
 
+// ==================== LOG VIEW: cardio ====================
+let currentCardio = { segments: [] }; // in-memory draft
+let logSubTab = "strength";
+
+function refreshCardioDatalist() {
+  const dl = $("#cardioOptions");
+  dl.innerHTML = db.getCardioTypes().map((t) => `<option value="${escapeHtml(t)}">`).join("");
+}
+
+function addCardioActivity(type) {
+  if (!type || !type.trim()) return;
+  currentCardio.segments.push({
+    activityType: type.trim(),
+    durationMin: null,
+    distance: null,
+    calories: null,
+    avgHr: null,
+    maxHr: null,
+  });
+  renderCardioList();
+}
+
+function renderCardioList() {
+  const wrap = $("#cardioList");
+  wrap.innerHTML = "";
+  const distUnit = db.getSettings().distanceUnit;
+
+  const numberField = (label, key, seg, opts = {}) => `
+    <div class="cardio-field">
+      <label>${label}</label>
+      <input type="number" inputmode="decimal" min="0" step="${opts.step || 1}" placeholder="${opts.placeholder || "—"}"
+        class="cardio-input" data-key="${key}" value="${seg[key] ?? ""}">
+    </div>`;
+
+  currentCardio.segments.forEach((seg, idx) => {
+    const card = document.createElement("div");
+    card.className = "exercise-card cardio-card";
+    card.innerHTML = `
+      <div class="exercise-card-header">
+        <h3>${escapeHtml(seg.activityType)}</h3>
+        <button class="remove-exercise" data-idx="${idx}">Remove</button>
+      </div>
+      <div class="cardio-field-grid">
+        ${numberField("Duration (min)", "durationMin", seg, { step: 0.5 })}
+        ${numberField(`Distance (${distUnit})`, "distance", seg, { step: 0.1 })}
+      </div>
+      <div class="cardio-field-grid thirds">
+        ${numberField("Calories", "calories", seg)}
+        ${numberField("Avg HR", "avgHr", seg)}
+        ${numberField("Max HR", "maxHr", seg)}
+      </div>
+    `;
+    $$(".cardio-input", card).forEach((input) => {
+      input.addEventListener("input", (e) => {
+        const v = e.target.value;
+        seg[e.target.dataset.key] = v === "" ? null : parseFloat(v);
+      });
+    });
+    $(".remove-exercise", card).addEventListener("click", () => {
+      currentCardio.segments.splice(idx, 1);
+      renderCardioList();
+    });
+    wrap.appendChild(card);
+  });
+}
+
 function resetLogForm() {
   currentWorkout = { exercises: [] };
+  currentCardio = { segments: [] };
   $("#workoutName").value = "";
   renderExerciseList();
+  renderCardioList();
   $("#workoutDate").textContent = fmtDate(new Date());
+}
+
+function setLogSubTab(sub) {
+  logSubTab = sub;
+  $$(".seg-btn", $("#logSubnav")).forEach((b) => b.classList.toggle("active", b.dataset.sub === sub));
+  $("#logStrength").hidden = sub !== "strength";
+  $("#logCardio").hidden = sub !== "cardio";
 }
 
 function initLogView() {
   $("#workoutDate").textContent = fmtDate(new Date());
+
+  $$(".seg-btn", $("#logSubnav")).forEach((btn) =>
+    btn.addEventListener("click", () => setLogSubTab(btn.dataset.sub))
+  );
+
+  $("#addCardioBtn").addEventListener("click", () => {
+    const input = $("#cardioTypePicker");
+    const type = input.value.trim();
+    if (!type) return;
+    db.addCustomCardioType(type);
+    addCardioActivity(type);
+    input.value = "";
+    refreshCardioDatalist();
+  });
+  $("#cardioTypePicker").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      $("#addCardioBtn").click();
+    }
+  });
 
   $("#addExerciseBtn").addEventListener("click", () => {
     const input = $("#exercisePicker");
@@ -183,20 +279,30 @@ function initLogView() {
   });
 
   $("#finishWorkoutBtn").addEventListener("click", () => {
-    const loggedExercises = currentWorkout.exercises
-      .map((ex) => ({
-        exerciseName: ex.exerciseName,
-        sets: ex.sets.filter((s) => s.weight != null || s.reps != null),
-      }))
-      .filter((ex) => ex.sets.length > 0);
+    const name = $("#workoutName").value.trim() || (logSubTab === "cardio" ? "Cardio" : "Workout");
 
-    if (loggedExercises.length === 0) {
-      toast("Add at least one set before saving");
-      return;
+    if (logSubTab === "strength") {
+      const loggedExercises = currentWorkout.exercises
+        .map((ex) => ({
+          exerciseName: ex.exerciseName,
+          sets: ex.sets.filter((s) => s.weight != null || s.reps != null),
+        }))
+        .filter((ex) => ex.sets.length > 0);
+
+      if (loggedExercises.length === 0) {
+        toast("Add at least one set before saving");
+        return;
+      }
+      db.saveWorkout({ type: "strength", date: todayISO(), name, exercises: loggedExercises });
+    } else {
+      const loggedSegments = currentCardio.segments.filter((s) => s.durationMin != null || s.distance != null);
+      if (loggedSegments.length === 0) {
+        toast("Add a duration or distance before saving");
+        return;
+      }
+      db.saveWorkout({ type: "cardio", date: todayISO(), name, segments: loggedSegments });
     }
 
-    const name = $("#workoutName").value.trim() || "Workout";
-    db.saveWorkout({ date: todayISO(), name, exercises: loggedExercises });
     toast("Workout saved ✓");
     resetLogForm();
     refreshRoutineQuickstart();
@@ -205,14 +311,44 @@ function initLogView() {
 
   resetLogForm();
   refreshExerciseDatalist();
+  refreshCardioDatalist();
   refreshRoutineQuickstart();
 }
 
 // ==================== HISTORY VIEW ====================
+function isCardio(w) {
+  return w.type === "cardio";
+}
+
 function workoutSummary(w) {
+  if (isCardio(w)) {
+    const distUnit = db.getSettings().distanceUnit;
+    const n = w.segments.length;
+    const totalMin = w.segments.reduce((s, seg) => s + (seg.durationMin || 0), 0);
+    const totalDist = w.segments.reduce((s, seg) => s + (seg.distance || 0), 0);
+    const parts = [`${n} activit${n === 1 ? "y" : "ies"}`];
+    if (totalMin) parts.push(`${round1(totalMin)} min`);
+    if (totalDist) parts.push(`${round1(totalDist)} ${distUnit}`);
+    return parts.join(" · ");
+  }
   const exCount = w.exercises.length;
   const setCount = w.exercises.reduce((n, ex) => n + ex.sets.length, 0);
   return `${exCount} exercise${exCount === 1 ? "" : "s"} · ${setCount} set${setCount === 1 ? "" : "s"}`;
+}
+
+function round1(n) {
+  return Math.round(n * 10) / 10;
+}
+
+function cardioSegmentLine(seg, distUnit) {
+  const parts = [];
+  if (seg.durationMin != null) parts.push(`${round1(seg.durationMin)} min`);
+  if (seg.distance != null) parts.push(`${round1(seg.distance)} ${distUnit}`);
+  if (seg.avgHr != null || seg.maxHr != null) {
+    parts.push(`${seg.avgHr ?? "?"}${seg.maxHr != null ? "/" + seg.maxHr : ""} bpm`);
+  }
+  if (seg.calories != null) parts.push(`${seg.calories} cal`);
+  return parts.join(" · ");
 }
 
 function renderHistory() {
@@ -220,32 +356,38 @@ function renderHistory() {
   const query = ($("#historySearch").value || "").toLowerCase().trim();
   let workouts = db.getWorkouts();
   if (query) {
-    workouts = workouts.filter(
-      (w) =>
-        w.name.toLowerCase().includes(query) ||
-        w.exercises.some((ex) => ex.exerciseName.toLowerCase().includes(query))
-    );
+    workouts = workouts.filter((w) => {
+      if (w.name.toLowerCase().includes(query)) return true;
+      if (isCardio(w)) return w.segments.some((s) => s.activityType.toLowerCase().includes(query));
+      return w.exercises.some((ex) => ex.exerciseName.toLowerCase().includes(query));
+    });
   }
 
   $("#historyEmpty").hidden = db.getWorkouts().length > 0;
   listEl.innerHTML = "";
 
   const unit = db.getSettings().unit;
+  const distUnit = db.getSettings().distanceUnit;
 
   workouts.forEach((w) => {
     const card = document.createElement("div");
     card.className = "history-card";
-    const detailHtml = w.exercises
-      .map((ex) => {
-        const setsStr = ex.sets
-          .map((s) => `${s.reps ?? "?"}×${s.weight != null ? s.weight : "?"}${unit}`)
-          .join(", ");
-        return `<div class="ex-line"><span>${escapeHtml(ex.exerciseName)}</span><span>${setsStr}</span></div>`;
-      })
-      .join("");
+    const cardio = isCardio(w);
+
+    const detailHtml = cardio
+      ? w.segments
+          .map((seg) => `<div class="ex-line"><span>${escapeHtml(seg.activityType)}</span><span>${cardioSegmentLine(seg, distUnit)}</span></div>`)
+          .join("")
+      : w.exercises
+          .map((ex) => {
+            const setsStr = ex.sets.map((s) => `${s.reps ?? "?"}×${s.weight != null ? s.weight : "?"}${unit}`).join(", ");
+            return `<div class="ex-line"><span>${escapeHtml(ex.exerciseName)}</span><span>${setsStr}</span></div>`;
+          })
+          .join("");
+
     card.innerHTML = `
       <div class="history-card-top">
-        <h3>${escapeHtml(w.name)}</h3>
+        <h3>${cardio ? '<span class="tag movement">Cardio</span> ' : ""}${escapeHtml(w.name)}</h3>
         <span class="history-card-date">${fmtDate(w.date)}</span>
       </div>
       <div class="history-card-summary">${workoutSummary(w)}</div>
@@ -279,14 +421,21 @@ function renderHistory() {
       e.stopPropagation();
       const w = db.getWorkout(btn.dataset.id);
       if (!w) return;
-      currentWorkout = {
-        exercises: w.exercises.map((ex) => ({
-          exerciseName: ex.exerciseName,
-          sets: ex.sets.map((s) => ({ reps: s.reps, weight: s.weight, done: false })),
-        })),
-      };
       $("#workoutName").value = w.name;
-      renderExerciseList();
+      if (isCardio(w)) {
+        currentCardio = { segments: w.segments.map((s) => ({ ...s })) };
+        renderCardioList();
+        setLogSubTab("cardio");
+      } else {
+        currentWorkout = {
+          exercises: w.exercises.map((ex) => ({
+            exerciseName: ex.exerciseName,
+            sets: ex.sets.map((s) => ({ reps: s.reps, weight: s.weight, done: false })),
+          })),
+        };
+        renderExerciseList();
+        setLogSubTab("strength");
+      }
       switchView("log");
       toast("Loaded into Log — edit & save");
     })
@@ -691,6 +840,15 @@ function initSettingsView() {
       db.saveSettings({ unit: btn.dataset.unit });
       $$(".seg-btn", $("#unitSegmented")).forEach((b) => b.classList.toggle("active", b === btn));
       toast(`Units set to ${btn.dataset.unit}`);
+    });
+  });
+
+  $$(".seg-btn", $("#distanceUnitSegmented")).forEach((btn) => {
+    btn.classList.toggle("active", btn.dataset.unit === settings.distanceUnit);
+    btn.addEventListener("click", () => {
+      db.saveSettings({ distanceUnit: btn.dataset.unit });
+      $$(".seg-btn", $("#distanceUnitSegmented")).forEach((b) => b.classList.toggle("active", b === btn));
+      toast(`Distance unit set to ${btn.dataset.unit}`);
     });
   });
 
