@@ -4,6 +4,7 @@ import { renderProgressChart } from "./charts.js";
 import { MUSCLES, MOVEMENTS, MOVEMENT_LABEL } from "./exerciseLibrary.js";
 import { getWeekRange, computeVolume } from "./volume.js";
 import { renderBodyMaps, applyVolumeColors } from "./bodyMap.js";
+import { initSync, isSignedIn, signIn, signOut, flushSyncQueue, pendingCount } from "./sync.js";
 
 // ==================== Helpers ====================
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -1166,8 +1167,58 @@ function initLibraryView() {
 }
 
 // ==================== SETTINGS VIEW ====================
+async function renderSyncStatus() {
+  const signedIn = await isSignedIn();
+  $("#syncSignedOut").hidden = signedIn;
+  $("#syncSignedIn").hidden = !signedIn;
+  if (signedIn) {
+    const n = pendingCount();
+    $("#syncStatus").textContent = n > 0 ? `${n} pending…` : "Synced ✓";
+  }
+}
+
+function initSyncSettings() {
+  renderSyncStatus();
+
+  $("#syncSignInBtn").addEventListener("click", async () => {
+    const pin = $("#syncPin").value.trim();
+    $("#syncError").hidden = true;
+    $("#syncSignInBtn").disabled = true;
+    $("#syncSignInBtn").textContent = "Signing in…";
+    try {
+      await signIn(pin);
+      $("#syncPin").value = "";
+      toast("Cloud sync enabled ✓");
+      await renderSyncStatus();
+    } catch (e) {
+      $("#syncError").textContent = e.message;
+      $("#syncError").hidden = false;
+    }
+    $("#syncSignInBtn").disabled = false;
+    $("#syncSignInBtn").textContent = "Sign in";
+  });
+  $("#syncPin").addEventListener("keydown", (e) => {
+    if (e.key === "Enter") $("#syncSignInBtn").click();
+  });
+
+  $("#syncNowBtn").addEventListener("click", async () => {
+    $("#syncNowBtn").disabled = true;
+    $("#syncStatus").textContent = "Syncing…";
+    await flushSyncQueue();
+    await renderSyncStatus();
+    $("#syncNowBtn").disabled = false;
+  });
+
+  $("#syncSignOutBtn").addEventListener("click", async () => {
+    await signOut();
+    toast("Cloud sync turned off");
+    await renderSyncStatus();
+  });
+}
+
 function initSettingsView() {
   const settings = db.getSettings();
+  initSyncSettings();
   $$(".seg-btn", $("#unitSegmented")).forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.unit === settings.unit);
     btn.addEventListener("click", () => {
@@ -1278,6 +1329,7 @@ function init() {
   initLibraryView();
   initSettingsView();
   initRestTimer();
+  initSync(); // background, doesn't block anything above
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {

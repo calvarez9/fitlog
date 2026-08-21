@@ -1,5 +1,9 @@
 // ---------- Local-first storage layer ----------
-// Everything lives in localStorage as plain JSON. No server, no accounts.
+// Everything lives in localStorage as plain JSON -- reads/writes here never
+// touch the network. A best-effort background sync layer (sync.js) queues
+// every save/delete for push to the Fitness Dashboard once signed in; see
+// the queue* calls below and js/sync.js for how that works.
+import { queueWorkoutSync, queueWorkoutDelete, queueExerciseSync, queueExerciseDelete } from "./sync.js";
 
 const KEYS = {
   workouts: "fitlog_workouts",
@@ -90,6 +94,7 @@ export function addCustomExercise(name) {
   const custom = read(KEYS.exercises, []);
   custom.push({ name, ...EMPTY_META, muscles: {} });
   write(KEYS.exercises, custom);
+  queueExerciseSync(name);
 }
 
 // Full add/edit from the Exercise Library: name + movement + muscles + athleticism.
@@ -104,6 +109,8 @@ export function saveCustomExercise({ name, movement, muscles, athleticism }, ori
   if (idx >= 0) all[idx] = entry;
   else all.push(entry);
   write(KEYS.exercises, all);
+  if (originalName && originalName !== name) queueExerciseDelete(originalName);
+  queueExerciseSync(name);
   return entry;
 }
 
@@ -112,6 +119,7 @@ export function saveCustomExercise({ name, movement, muscles, athleticism }, ori
 export function deleteCustomExercise(name) {
   const all = read(KEYS.exercises, []).map(normalizeCustom).filter((e) => e.name !== name);
   write(KEYS.exercises, all);
+  queueExerciseDelete(name);
 }
 
 // ---------- Cardio activity types ----------
@@ -149,12 +157,14 @@ export function saveWorkout(workout) {
   if (idx >= 0) all[idx] = workout;
   else all.push(workout);
   write(KEYS.workouts, all);
+  queueWorkoutSync(workout.id);
   return workout;
 }
 
 export function deleteWorkout(id) {
   const all = read(KEYS.workouts, []).filter((w) => w.id !== id);
   write(KEYS.workouts, all);
+  queueWorkoutDelete(id);
 }
 
 // ---------- Routines ----------

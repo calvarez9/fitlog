@@ -182,6 +182,23 @@
       </div>
 
       <div class="settings-group">
+        <h3>Cloud Sync</h3>
+        <p class="muted small">Signs your workouts and exercise library to the Fitness Dashboard automatically, in the background. Logging still works fully offline either way -- anything logged without a connection just syncs the next time you're online.</p>
+        <div id="syncSignedOut">
+          <div class="row">
+            <input id="syncPin" class="pin-input" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" placeholder="6-digit PIN" />
+            <button id="syncSignInBtn" class="btn secondary">Sign in</button>
+          </div>
+          <p id="syncError" class="error-text" hidden></p>
+        </div>
+        <div id="syncSignedIn" class="row" hidden>
+          <p id="syncStatus" class="muted small"></p>
+          <button id="syncNowBtn" class="btn secondary small">Sync now</button>
+          <button id="syncSignOutBtn" class="btn secondary small">Sign out</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
         <h3>Backup</h3>
         <p class="muted small">Your data lives only on this device. Export regularly so you don't lose it.</p>
         <div class="row">
