@@ -51,12 +51,13 @@ export const JOINTS = [
 export const JOINT_LABEL = Object.fromEntries(JOINTS.map((j) => [j.key, j.label]));
 
 // name -> { movement, muscles: { muscleKey: fraction }, athleticism?, jointLoad? }
-// athleticism (absent = 0) is a per-set weight toward a training-emphasis
-// score, separate from movement/muscle credit: ordinary compound lifts get
-// a modest 0.2-0.4 (they build some general athletic capacity but aren't
-// explosive); genuinely explosive/power movements (jumps, throws, Olympic
-// lifts) are weighted far higher -- see the entries below the plain
-// strength list. Isolation work stays at 0 (unset).
+// athleticism (absent = 0) is a per-set credit toward Athleticism, in the
+// same "credited sets" spirit as muscle/movement volume above -- not a
+// free-floating score. A set of isolation work counts 0; an ordinary
+// compound lift counts as a fraction of a set (0.2-0.5, scaled by how
+// demanding the lift is); a genuinely explosive/power movement (jumps,
+// throws, Olympic lifts -- see the entries below the plain strength list)
+// counts as a full set, same value a regular working set gets.
 // jointLoad (absent = {}) is a separate per-set weight (0-1, occasionally
 // higher) toward each of the three joints above -- how much a set of this
 // exercise taxes that joint, regardless of which muscle it's training.
@@ -64,9 +65,9 @@ export const JOINT_LABEL = Object.fromEntries(JOINTS.map((j) => [j.key, j.label]
 // on the knee joint itself, which is exactly why this is its own field
 // rather than derived from muscles/movement.
 export const BUILTIN_EXERCISES = {
-  "Barbell Squat": { movement: "squat", muscles: { quadriceps: 1, glutes: 1, hamstrings: 0.5, abs: 0.5, lowerBack: 0.5, adductors: 0.5 }, athleticism: 0.4, jointLoad: { knees: 0.8, lowBack: 0.5 } },
+  "Barbell Squat": { movement: "squat", muscles: { quadriceps: 1, glutes: 1, hamstrings: 0.5, abs: 0.5, lowerBack: 0.5, adductors: 0.5 }, athleticism: 0.5, jointLoad: { knees: 0.8, lowBack: 0.5 } },
   "Bench Press": { movement: "horizontalPush", muscles: { chest: 1, triceps: 0.5, frontDelts: 0.5 }, athleticism: 0.2, jointLoad: { shoulders: 0.4 } },
-  "Deadlift": { movement: "hinge", muscles: { hamstrings: 1, glutes: 1, lowerBack: 1, upperBack: 0.5, traps: 0.5, forearms: 0.5 }, athleticism: 0.4, jointLoad: { lowBack: 1, knees: 0.2 } },
+  "Deadlift": { movement: "hinge", muscles: { hamstrings: 1, glutes: 1, lowerBack: 1, upperBack: 0.5, traps: 0.5, forearms: 0.5 }, athleticism: 0.5, jointLoad: { lowBack: 1, knees: 0.2 } },
   "Overhead Press": { movement: "verticalPush", muscles: { frontDelts: 1, middleDelts: 0.5, triceps: 0.5 }, athleticism: 0.3, jointLoad: { shoulders: 0.9 } },
   "Barbell Row": { movement: "horizontalPull", muscles: { upperBack: 1, lats: 0.5, biceps: 0.5, rearDelts: 0.5 }, athleticism: 0.2, jointLoad: { lowBack: 0.4, shoulders: 0.2 } },
   "Pull-Up": { movement: "verticalPull", muscles: { lats: 1, upperBack: 0.5, biceps: 0.5 }, athleticism: 0.3, jointLoad: { shoulders: 0.3 } },
@@ -96,7 +97,7 @@ export const BUILTIN_EXERCISES = {
   "Hanging Leg Raise": { movement: "isolation", muscles: { abs: 1, hipFlexors: 1, obliques: 0.5 }, jointLoad: { shoulders: 0.3, lowBack: 0.1 } },
   "Side Plank": { movement: "isolation", muscles: { obliques: 1, abs: 0.5 }, jointLoad: { lowBack: 0.1 } },
   "Bird Dog": { movement: "isolation", muscles: { lowerBack: 1, abs: 0.5, glutes: 0.5 }, jointLoad: { lowBack: 0.2 } },
-  "Sumo Deadlift": { movement: "hinge", muscles: { adductors: 1, glutes: 1, hamstrings: 0.5, lowerBack: 0.5, quadriceps: 0.5 }, athleticism: 0.4, jointLoad: { lowBack: 0.8, knees: 0.3 } },
+  "Sumo Deadlift": { movement: "hinge", muscles: { adductors: 1, glutes: 1, hamstrings: 0.5, lowerBack: 0.5, quadriceps: 0.5 }, athleticism: 0.5, jointLoad: { lowBack: 0.8, knees: 0.3 } },
   "Hip Adduction Machine": { movement: "isolation", muscles: { adductors: 1 }, jointLoad: { knees: 0.1 } },
   "Hip Abduction Machine": { movement: "isolation", muscles: { abductors: 1 }, jointLoad: { knees: 0.1 } },
   "Standing Cable Hip Flexion": { movement: "isolation", muscles: { hipFlexors: 1 } },
@@ -106,29 +107,31 @@ export const BUILTIN_EXERCISES = {
   "Front Raise": { movement: "isolation", muscles: { frontDelts: 1 }, jointLoad: { shoulders: 0.4 } },
   "Shrug": { movement: "isolation", muscles: { traps: 1 } },
   "Good Morning": { movement: "hinge", muscles: { hamstrings: 1, lowerBack: 1, glutes: 0.5 }, athleticism: 0.3, jointLoad: { lowBack: 0.9 } },
-  "Farmer's Carry": { movement: "isolation", muscles: { forearms: 1, traps: 0.5, abs: 0.5 }, athleticism: 0.4, jointLoad: { lowBack: 0.3, shoulders: 0.2 } },
+  "Farmer's Carry": { movement: "isolation", muscles: { forearms: 1, traps: 0.5, abs: 0.5 }, athleticism: 0.5, jointLoad: { lowBack: 0.3, shoulders: 0.2 } },
 
   // Explosive/power movements -- jumps, throws, Olympic lifts, and similar.
-  // Weighted well above the compound-lift range (1.0-2.0/set) since these
-  // specifically train power/speed/coordination rather than just moving load.
-  // Note jointLoad tracks *joint stress*, which stays independently high on
-  // these even when athleticism/muscle credit differ -- landing/catching
-  // forces are the driver, not just the working muscle.
-  "Box Jump": { movement: "squat", muscles: { quadriceps: 1, glutes: 1, calves: 0.5 }, athleticism: 1.5, jointLoad: { knees: 0.7 } },
-  "Broad Jump": { movement: "squat", muscles: { quadriceps: 1, glutes: 1, hamstrings: 0.5 }, athleticism: 1.5, jointLoad: { knees: 0.6, lowBack: 0.2 } },
-  "Depth Jump": { movement: "squat", muscles: { quadriceps: 1, glutes: 1, calves: 0.5 }, athleticism: 1.8, jointLoad: { knees: 0.9 } },
-  "Jump Squat": { movement: "squat", muscles: { quadriceps: 1, glutes: 1 }, athleticism: 1.2, jointLoad: { knees: 0.7 } },
-  "Tuck Jump": { movement: "squat", muscles: { quadriceps: 1, calves: 0.5, abs: 0.5 }, athleticism: 1.3, jointLoad: { knees: 0.6 } },
-  "Medicine Ball Slam": { movement: "isolation", muscles: { abs: 1, obliques: 0.5, lats: 0.5 }, athleticism: 1.3, jointLoad: { lowBack: 0.3, shoulders: 0.3 } },
-  "Medicine Ball Chest Throw": { movement: "horizontalPush", muscles: { chest: 1, frontDelts: 0.5, triceps: 0.5 }, athleticism: 1.3, jointLoad: { shoulders: 0.4 } },
-  "Medicine Ball Rotational Throw": { movement: "isolation", muscles: { obliques: 1, abs: 0.5 }, athleticism: 1.3, jointLoad: { lowBack: 0.3 } },
-  "Clean": { movement: "hinge", muscles: { hamstrings: 1, glutes: 1, traps: 1, upperBack: 0.5, quadriceps: 0.5 }, athleticism: 1.8, jointLoad: { lowBack: 0.5, knees: 0.4, shoulders: 0.3 } },
-  "Snatch": { movement: "hinge", muscles: { hamstrings: 1, glutes: 1, traps: 1, frontDelts: 0.5, quadriceps: 0.5 }, athleticism: 2, jointLoad: { lowBack: 0.6, knees: 0.4, shoulders: 0.5 } },
-  "Clean and Jerk": { movement: "hinge", muscles: { hamstrings: 1, glutes: 1, traps: 1, frontDelts: 0.5, quadriceps: 0.5 }, athleticism: 2, jointLoad: { lowBack: 0.6, knees: 0.5, shoulders: 0.5 } },
-  "Jerk": { movement: "verticalPush", muscles: { frontDelts: 1, triceps: 0.5, quadriceps: 0.5 }, athleticism: 1.8, jointLoad: { shoulders: 0.6, knees: 0.3 } },
+  // Each one counts as a full set (1, same as compound lifts' 0.2-0.5 caps
+  // out below), not a variably-weighted score -- these specifically train
+  // power/speed/coordination rather than just moving load, which is
+  // credit enough on its own without trying to rank explosive movements
+  // against each other. jointLoad still varies per movement though --
+  // that tracks joint *stress*, a completely separate question from how
+  // much Athleticism credit the set earns.
+  "Box Jump": { movement: "squat", muscles: { quadriceps: 1, glutes: 1, calves: 0.5 }, athleticism: 1, jointLoad: { knees: 0.7 } },
+  "Broad Jump": { movement: "squat", muscles: { quadriceps: 1, glutes: 1, hamstrings: 0.5 }, athleticism: 1, jointLoad: { knees: 0.6, lowBack: 0.2 } },
+  "Depth Jump": { movement: "squat", muscles: { quadriceps: 1, glutes: 1, calves: 0.5 }, athleticism: 1, jointLoad: { knees: 0.9 } },
+  "Jump Squat": { movement: "squat", muscles: { quadriceps: 1, glutes: 1 }, athleticism: 1, jointLoad: { knees: 0.7 } },
+  "Tuck Jump": { movement: "squat", muscles: { quadriceps: 1, calves: 0.5, abs: 0.5 }, athleticism: 1, jointLoad: { knees: 0.6 } },
+  "Medicine Ball Slam": { movement: "isolation", muscles: { abs: 1, obliques: 0.5, lats: 0.5 }, athleticism: 1, jointLoad: { lowBack: 0.3, shoulders: 0.3 } },
+  "Medicine Ball Chest Throw": { movement: "horizontalPush", muscles: { chest: 1, frontDelts: 0.5, triceps: 0.5 }, athleticism: 1, jointLoad: { shoulders: 0.4 } },
+  "Medicine Ball Rotational Throw": { movement: "isolation", muscles: { obliques: 1, abs: 0.5 }, athleticism: 1, jointLoad: { lowBack: 0.3 } },
+  "Clean": { movement: "hinge", muscles: { hamstrings: 1, glutes: 1, traps: 1, upperBack: 0.5, quadriceps: 0.5 }, athleticism: 1, jointLoad: { lowBack: 0.5, knees: 0.4, shoulders: 0.3 } },
+  "Snatch": { movement: "hinge", muscles: { hamstrings: 1, glutes: 1, traps: 1, frontDelts: 0.5, quadriceps: 0.5 }, athleticism: 1, jointLoad: { lowBack: 0.6, knees: 0.4, shoulders: 0.5 } },
+  "Clean and Jerk": { movement: "hinge", muscles: { hamstrings: 1, glutes: 1, traps: 1, frontDelts: 0.5, quadriceps: 0.5 }, athleticism: 1, jointLoad: { lowBack: 0.6, knees: 0.5, shoulders: 0.5 } },
+  "Jerk": { movement: "verticalPush", muscles: { frontDelts: 1, triceps: 0.5, quadriceps: 0.5 }, athleticism: 1, jointLoad: { shoulders: 0.6, knees: 0.3 } },
   "Push Press": { movement: "verticalPush", muscles: { frontDelts: 1, triceps: 0.5, quadriceps: 0.3 }, athleticism: 1, jointLoad: { shoulders: 0.7, knees: 0.2, lowBack: 0.2 } },
   "Kettlebell Swing": { movement: "hinge", muscles: { glutes: 1, hamstrings: 1, lowerBack: 0.5 }, athleticism: 1, jointLoad: { lowBack: 0.6 } },
-  "Sprint": { movement: "isolation", muscles: { quadriceps: 0.5, hamstrings: 1, glutes: 0.5, calves: 0.5 }, athleticism: 1.5, jointLoad: { knees: 0.4, lowBack: 0.2 } },
+  "Sprint": { movement: "isolation", muscles: { quadriceps: 0.5, hamstrings: 1, glutes: 0.5, calves: 0.5 }, athleticism: 1, jointLoad: { knees: 0.4, lowBack: 0.2 } },
   "Burpee": { movement: "isolation", muscles: { chest: 0.5, quadriceps: 0.5, abs: 0.5 }, athleticism: 1, jointLoad: { knees: 0.3, shoulders: 0.2, lowBack: 0.2 } },
   "Battle Ropes": { movement: "isolation", muscles: { frontDelts: 0.5, abs: 0.5, forearms: 0.5 }, athleticism: 1, jointLoad: { shoulders: 0.5 } },
 };

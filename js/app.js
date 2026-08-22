@@ -1007,7 +1007,7 @@ function renderVolumeProgress() {
 
   $("#emphasisCards").innerHTML = `
     <div class="pr-card"><div class="pr-label">Strength</div><div class="pr-value">${strengthSets}</div><div class="pr-sub">working sets</div></div>
-    <div class="pr-card"><div class="pr-label">Athleticism</div><div class="pr-value">${athleticismScore}</div><div class="pr-sub">weighted score</div></div>
+    <div class="pr-card"><div class="pr-label">Athleticism</div><div class="pr-value">${athleticismScore}</div><div class="pr-sub">credited sets</div></div>
     <div class="pr-card"><div class="pr-label">Cardio</div><div class="pr-value">${Math.round(cardioMinutes)}</div><div class="pr-sub">minutes</div></div>
   `;
 
