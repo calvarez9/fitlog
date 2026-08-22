@@ -1,6 +1,6 @@
 // ---------- Weekly muscle & movement-pattern volume ----------
 import { getExerciseMeta } from "./db.js";
-import { MUSCLES, MOVEMENTS, MOVEMENT_LABEL } from "./exerciseLibrary.js";
+import { MUSCLES, MOVEMENTS, MOVEMENT_LABEL, JOINTS } from "./exerciseLibrary.js";
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -30,6 +30,7 @@ export function getWeekRange(offset = 0) {
 export function computeVolume(workouts, { start, end }) {
   const muscleTotals = Object.fromEntries(MUSCLES.map((m) => [m.key, 0]));
   const movementTotals = Object.fromEntries(MOVEMENTS.map((m) => [m.key, 0]));
+  const jointTotals = Object.fromEntries(JOINTS.map((j) => [j.key, 0]));
   let strengthSets = 0;
   let athleticismScore = 0;
   let cardioMinutes = 0;
@@ -56,6 +57,9 @@ export function computeVolume(workouts, { start, end }) {
         Object.entries(meta.muscles || {}).forEach(([muscle, frac]) => {
           muscleTotals[muscle] = (muscleTotals[muscle] || 0) + setCount * frac;
         });
+        Object.entries(meta.jointLoad || {}).forEach(([joint, load]) => {
+          jointTotals[joint] = (jointTotals[joint] || 0) + setCount * load;
+        });
       });
     });
 
@@ -67,11 +71,15 @@ export function computeVolume(workouts, { start, end }) {
     .filter((r) => r.sets > 0)
     .sort((a, b) => b.sets - a.sets);
 
+  const jointRows = JOINTS.map((j) => ({ key: j.key, label: j.label, load: round(jointTotals[j.key]) }));
+
   return {
     muscleRows,
     movementRows,
     muscleTotals,
     movementTotals,
+    jointRows,
+    jointTotals,
     strengthSets,
     athleticismScore: round(athleticismScore),
     cardioMinutes: Math.round(cardioMinutes),

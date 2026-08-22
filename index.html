@@ -141,6 +141,12 @@
           <div id="movementBarList" class="volume-bar-list"></div>
         </div>
 
+        <div class="volume-section">
+          <h3 class="volume-section-title">Joint Load</h3>
+          <p class="muted small" style="margin:0 0 8px">This week vs last week — a fatigue signal, not a score to chase.</p>
+          <div id="jointLoadCards" class="pr-cards"></div>
+        </div>
+
         <p id="volumeEmpty" class="empty-state" hidden>No sets logged this week yet.</p>
       </div>
     </section>
@@ -245,6 +251,14 @@
         <div>
           <div class="field-label">Athleticism (0 = none, 1–2 = explosive/power)</div>
           <input type="number" id="exerciseFormAthleticism" min="0" max="3" step="0.1" placeholder="0" />
+        </div>
+        <div>
+          <div class="field-label">Joint load (0 = none, up to ~1 = heavy)</div>
+          <div class="joint-load-grid">
+            <label>Low Back<input type="number" id="exerciseFormJoint-lowBack" min="0" max="2" step="0.1" placeholder="0" /></label>
+            <label>Knees<input type="number" id="exerciseFormJoint-knees" min="0" max="2" step="0.1" placeholder="0" /></label>
+            <label>Shoulders<input type="number" id="exerciseFormJoint-shoulders" min="0" max="2" step="0.1" placeholder="0" /></label>
+          </div>
         </div>
         <div>
           <div class="field-label">Primary muscles (full credit)</div>

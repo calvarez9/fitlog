@@ -1,7 +1,7 @@
 import * as db from "./db.js";
 import { initTimer } from "./timer.js";
 import { renderProgressChart } from "./charts.js";
-import { MUSCLES, MOVEMENTS, MOVEMENT_LABEL } from "./exerciseLibrary.js";
+import { MUSCLES, MOVEMENTS, MOVEMENT_LABEL, JOINTS } from "./exerciseLibrary.js";
 import { getWeekRange, computeVolume } from "./volume.js";
 import { renderBodyMaps, applyVolumeColors } from "./bodyMap.js";
 import { initSync, isSignedIn, signIn, signOut, flushSyncQueue, pendingCount } from "./sync.js";
@@ -195,7 +195,7 @@ function renderExerciseList() {
         </div>
         ${best ? `<p class="exercise-best-lift muted small">Best: ${best.weight}${unit} × ${best.reps}</p>` : ""}
         <div class="set-row-labels">
-          <span>#</span><span>Weight (${unit})</span><span>Reps</span><span>RPE</span><span>✓</span>
+          <span>#</span><span>Reps</span><span>Weight (${unit})</span><span>RPE</span><span>✓</span>
         </div>
         <div class="sets-table" data-ex="${exIdx}"></div>
         <div class="exercise-card-footer">
@@ -209,8 +209,8 @@ function renderExerciseList() {
         row.className = "set-row" + (set.isWarmup ? " warmup-row" : "");
         row.innerHTML = `
           <span class="set-index">${set.isWarmup ? "W" : setIdx + 1}</span>
-          <input type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" class="weight-input" value="${set.weight ?? ""}">
           <input type="number" inputmode="numeric" min="0" placeholder="0" class="reps-input" value="${set.reps ?? ""}">
+          <input type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" class="weight-input" value="${set.weight ?? ""}">
           <input type="number" inputmode="decimal" step="0.5" min="0" max="10" placeholder="—" class="rpe-input" value="${set.rpe ?? ""}">
           <button class="set-done ${set.done ? "checked" : ""}" data-ex="${exIdx}" data-set="${setIdx}">${set.done ? "✓" : ""}</button>
         `;
@@ -983,18 +983,42 @@ function renderStrengthProgress() {
   renderProgressChart($("#progressChart"), points, { yLabel: unit + " (est. 1RM)" });
 }
 
+// Purely descriptive, no "good"/"bad" framing -- rising joint load isn't
+// inherently bad, it's a fatigue-management signal to be aware of, same
+// spirit as the dashboard's own period-comparison deltas.
+function jointDeltaText(current, prev) {
+  if (!current && !prev) return "no load logged";
+  if (!prev) return "new this week";
+  const pct = Math.round(((current - prev) / prev) * 100);
+  if (pct === 0) return "same as last wk";
+  return `${pct > 0 ? "+" : ""}${pct}% vs last wk`;
+}
+
 function renderVolumeProgress() {
   const { start, end, label } = getWeekRange(weekOffset);
   $("#weekLabel").textContent = label;
   $("#weekNextBtn").disabled = weekOffset >= 0;
 
-  const { muscleRows, movementRows, muscleTotals, strengthSets, athleticismScore, cardioMinutes } = computeVolume(db.getWorkouts(), { start, end });
+  const workouts = db.getWorkouts();
+  const { muscleRows, movementRows, muscleTotals, jointRows, jointTotals, strengthSets, athleticismScore, cardioMinutes } = computeVolume(workouts, {
+    start,
+    end,
+  });
 
   $("#emphasisCards").innerHTML = `
     <div class="pr-card"><div class="pr-label">Strength</div><div class="pr-value">${strengthSets}</div><div class="pr-sub">working sets</div></div>
     <div class="pr-card"><div class="pr-label">Athleticism</div><div class="pr-value">${athleticismScore}</div><div class="pr-sub">weighted score</div></div>
     <div class="pr-card"><div class="pr-label">Cardio</div><div class="pr-value">${Math.round(cardioMinutes)}</div><div class="pr-sub">minutes</div></div>
   `;
+
+  const prevRange = getWeekRange(weekOffset - 1);
+  const { jointTotals: prevJointTotals } = computeVolume(workouts, { start: prevRange.start, end: prevRange.end });
+  $("#jointLoadCards").innerHTML = jointRows
+    .map(
+      (j) =>
+        `<div class="pr-card"><div class="pr-label">${escapeHtml(j.label)}</div><div class="pr-value">${j.load}</div><div class="pr-sub">${jointDeltaText(jointTotals[j.key], prevJointTotals[j.key])}</div></div>`
+    )
+    .join("");
 
   applyVolumeColors($("#bodyFront"), $("#bodyBack"), muscleTotals);
 
@@ -1095,17 +1119,22 @@ function openExerciseForm(name = null) {
   let movement = "isolation";
   let muscles = {};
   let athleticism = 0;
+  let jointLoad = {};
   if (!isNew) {
     const meta = db.getExerciseMeta(name);
     movement = meta.movement;
     muscles = meta.muscles || {};
     athleticism = meta.athleticism || 0;
+    jointLoad = meta.jointLoad || {};
   }
 
   $("#exerciseFormTitle").textContent = isNew ? "Add Exercise" : "Edit Exercise";
   $("#exerciseFormName").value = isNew ? "" : name;
   $("#exerciseFormMovement").value = movement;
   $("#exerciseFormAthleticism").value = athleticism || "";
+  JOINTS.forEach((j) => {
+    $(`#exerciseFormJoint-${j.key}`).value = jointLoad[j.key] || "";
+  });
 
   const primaryKeys = Object.keys(muscles).filter((k) => muscles[k] === 1);
   const secondaryKeys = Object.keys(muscles).filter((k) => muscles[k] === 0.5);
@@ -1144,6 +1173,11 @@ function initLibraryView() {
     }
     const movement = $("#exerciseFormMovement").value;
     const athleticism = parseFloat($("#exerciseFormAthleticism").value) || 0;
+    const jointLoad = {};
+    JOINTS.forEach((j) => {
+      const v = parseFloat($(`#exerciseFormJoint-${j.key}`).value);
+      if (v) jointLoad[j.key] = v;
+    });
     const muscles = {};
     $$('input[data-muscle][data-group="primary"]').forEach((cb) => {
       if (cb.checked) muscles[cb.dataset.muscle] = 1;
@@ -1151,7 +1185,7 @@ function initLibraryView() {
     $$('input[data-muscle][data-group="secondary"]').forEach((cb) => {
       if (cb.checked && muscles[cb.dataset.muscle] !== 1) muscles[cb.dataset.muscle] = 0.5;
     });
-    db.saveCustomExercise({ name, movement, muscles, athleticism }, exerciseFormState.originalName);
+    db.saveCustomExercise({ name, movement, muscles, athleticism, jointLoad }, exerciseFormState.originalName);
     toast("Exercise saved ✓");
     refreshExerciseDatalist();
     switchView("library");

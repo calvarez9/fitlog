@@ -126,7 +126,10 @@ async function pushWorkoutDelete(id) {
 async function pushExercise(entry) {
   const { error } = await supabase
     .from("exercise_overrides")
-    .upsert({ name: entry.name, movement: entry.movement, muscles: entry.muscles || {}, athleticism: entry.athleticism || 0 }, { onConflict: "name" });
+    .upsert(
+      { name: entry.name, movement: entry.movement, muscles: entry.muscles || {}, athleticism: entry.athleticism || 0, joint_load: entry.jointLoad || {} },
+      { onConflict: "name" }
+    );
   if (error) throw error;
 }
 
