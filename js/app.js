@@ -187,12 +187,11 @@ function renderExerciseList() {
       card.className = "exercise-card";
       card.innerHTML = `
         <div class="exercise-card-header">
-          <h3 class="exercise-name-display" data-ex="${exIdx}">${escapeHtml(ex.exerciseName)}</h3>
+          <button type="button" class="exercise-name-display" data-ex="${exIdx}" title="Edit movement/muscles/athleticism">${escapeHtml(ex.exerciseName)} <span class="exercise-name-edit-hint">✎ edit</span></button>
           <div class="exercise-card-actions">
             <button class="move-exercise-up" data-ex="${exIdx}" title="Move up" ${isFirst ? "disabled" : ""}>▲</button>
             <button class="move-exercise-down" data-ex="${exIdx}" title="Move down" ${isLast ? "disabled" : ""}>▼</button>
             ${hasNext ? `<button class="link-exercise ${ex.linkedToNext ? "active" : ""}" data-ex="${exIdx}" title="Superset with next exercise">🔗</button>` : ""}
-            <button class="edit-exercise-props" data-ex="${exIdx}" title="Edit movement/muscles/athleticism">✎</button>
             <button class="swap-exercise" data-ex="${exIdx}" title="Swap exercise">⇄</button>
             <button class="remove-exercise" data-ex="${exIdx}">Remove</button>
           </div>
@@ -265,7 +264,7 @@ function renderExerciseList() {
   $$(".swap-exercise", wrap).forEach((btn) =>
     btn.addEventListener("click", () => startExerciseSwap(+btn.dataset.ex))
   );
-  $$(".edit-exercise-props", wrap).forEach((btn) =>
+  $$(".exercise-name-display", wrap).forEach((btn) =>
     btn.addEventListener("click", () => {
       const ex = currentWorkout.exercises[+btn.dataset.ex];
       openExerciseForm(ex.exerciseName, "log");
