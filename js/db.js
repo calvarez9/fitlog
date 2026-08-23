@@ -66,22 +66,22 @@ export function getExercises() {
   return all.sort((a, b) => a.localeCompare(b));
 }
 
-// Full { name, movement, muscles, athleticism, jointLoad, isCustom, isOverride } for every known exercise.
+// Full { name, movement, muscles, athleticism, jointLoad, metricType, isCustom, isOverride } for every known exercise.
 export function getAllExerciseObjects() {
   const customByName = new Map(getCustomExerciseObjects().map((e) => [e.name, e]));
   const names = getExercises();
   return names.map((name) => {
     const custom = customByName.get(name);
     const builtin = BUILTIN_EXERCISES[name];
-    if (custom) return { name, movement: custom.movement, muscles: custom.muscles, athleticism: custom.athleticism || 0, jointLoad: custom.jointLoad || {}, isCustom: !builtin, isOverride: !!builtin, createdAt: custom.createdAt || 0 };
-    return { name, movement: builtin.movement, muscles: builtin.muscles, athleticism: builtin.athleticism || 0, jointLoad: builtin.jointLoad || {}, isCustom: false, isOverride: false, createdAt: 0 };
+    if (custom) return { name, movement: custom.movement, muscles: custom.muscles, athleticism: custom.athleticism || 0, jointLoad: custom.jointLoad || {}, metricType: custom.metricType || "weighted", isCustom: !builtin, isOverride: !!builtin, createdAt: custom.createdAt || 0 };
+    return { name, movement: builtin.movement, muscles: builtin.muscles, athleticism: builtin.athleticism || 0, jointLoad: builtin.jointLoad || {}, metricType: builtin.metricType || "weighted", isCustom: false, isOverride: false, createdAt: 0 };
   });
 }
 
 // Metadata for a single exercise name, with graceful fallback for unknown names.
 export function getExerciseMeta(name) {
   const custom = getCustomExerciseObjects().find((e) => e.name === name);
-  if (custom) return { movement: custom.movement, muscles: custom.muscles, athleticism: custom.athleticism || 0, jointLoad: custom.jointLoad || {} };
+  if (custom) return { movement: custom.movement, muscles: custom.muscles, athleticism: custom.athleticism || 0, jointLoad: custom.jointLoad || {}, metricType: custom.metricType || "weighted" };
   if (BUILTIN_EXERCISES[name]) return BUILTIN_EXERCISES[name];
   return EMPTY_META;
 }
@@ -102,14 +102,14 @@ export function addCustomExercise(name) {
 // is set once on first creation and carried forward on every edit after
 // that -- it's what "Recently Added" sorts by, so an edit shouldn't bump an
 // exercise back to the top as if it were new.
-export function saveCustomExercise({ name, movement, muscles, athleticism, jointLoad }, originalName = null) {
+export function saveCustomExercise({ name, movement, muscles, athleticism, jointLoad, metricType }, originalName = null) {
   name = name.trim();
   if (!name) throw new Error("Name required");
   const all = read(KEYS.exercises, []).map(normalizeCustom);
   const targetName = originalName || name;
   const idx = all.findIndex((e) => e.name === targetName);
   const createdAt = idx >= 0 ? all[idx].createdAt || Date.now() : Date.now();
-  const entry = { name, movement, muscles, athleticism: athleticism || 0, jointLoad: jointLoad || {}, createdAt };
+  const entry = { name, movement, muscles, athleticism: athleticism || 0, jointLoad: jointLoad || {}, metricType: metricType || "weighted", createdAt };
   if (idx >= 0) all[idx] = entry;
   else all.push(entry);
   write(KEYS.exercises, all);

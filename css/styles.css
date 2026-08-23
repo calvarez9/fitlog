@@ -287,6 +287,9 @@ input::placeholder { color: var(--text-muted); }
   margin-bottom: 2px;
 }
 .set-row-labels span { text-align: center; }
+/* Bodyweight/Isometric logging has no weight column -- one fewer than the
+   default (weighted/loadedCarry both keep the full 5). */
+.set-row.cols-4, .set-row-labels.cols-4 { grid-template-columns: 22px 1fr 46px 34px; }
 .exercise-card-footer { display: flex; gap: 8px; margin-top: 8px; }
 .add-set-btn, .warmup-btn {
   background: none;

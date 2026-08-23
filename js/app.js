@@ -1,6 +1,6 @@
 import * as db from "./db.js";
 import { renderProgressChart } from "./charts.js";
-import { MUSCLES, MOVEMENTS, MOVEMENT_LABEL, JOINTS } from "./exerciseLibrary.js";
+import { MUSCLES, MOVEMENTS, MOVEMENT_LABEL, JOINTS, METRIC_TYPES } from "./exerciseLibrary.js";
 import { getWeekRange, computeVolume } from "./volume.js";
 import { renderBodyMaps, applyVolumeColors } from "./bodyMap.js";
 import { initSync, isSignedIn, signIn, signOut, flushSyncQueue, pendingCount } from "./sync.js";
@@ -34,20 +34,45 @@ function epley1RM(weight, reps) {
 // Best-ever set for an exercise (by est. 1RM), from already-saved workouts
 // only -- the workout currently being logged isn't saved yet, so this
 // naturally only ever shows real history, never today's own numbers.
-function bestSetFor(exerciseName) {
+// "Best" means something different per logging type -- there's no single
+// formula that covers weight x reps, a held time, a rep count, and a
+// weight x time carry all at once, so each type picks the metric that
+// actually answers "was this a PR" for that kind of set.
+function bestSetFor(exerciseName, metricType = "weighted") {
   let best = null;
   db.getWorkouts().forEach((w) => {
     if (w.type === "cardio") return;
     w.exercises.forEach((ex) => {
       if (ex.exerciseName !== exerciseName) return;
       ex.sets.forEach((s) => {
-        if (s.weight == null || s.isWarmup) return;
-        const oneRM = epley1RM(s.weight, s.reps || 1);
-        if (!best || oneRM > best.oneRM) best = { oneRM, weight: s.weight, reps: s.reps };
+        if (s.isWarmup) return;
+        if (metricType === "bodyweight") {
+          if (s.reps == null) return;
+          if (!best || s.reps > best.reps) best = { reps: s.reps };
+        } else if (metricType === "isometric") {
+          if (s.duration == null) return;
+          if (!best || s.duration > best.duration) best = { duration: s.duration };
+        } else if (metricType === "loadedCarry") {
+          if (s.weight == null) return;
+          if (!best || s.weight > best.weight || (s.weight === best.weight && (s.duration || 0) > (best.duration || 0))) {
+            best = { weight: s.weight, duration: s.duration };
+          }
+        } else {
+          if (s.weight == null) return;
+          const oneRM = epley1RM(s.weight, s.reps || 1);
+          if (!best || oneRM > best.oneRM) best = { oneRM, weight: s.weight, reps: s.reps };
+        }
       });
     });
   });
   return best;
+}
+
+function formatBestSet(best, metricType, unit) {
+  if (metricType === "bodyweight") return `Best: ${best.reps} reps`;
+  if (metricType === "isometric") return `Best: ${best.duration}s hold`;
+  if (metricType === "loadedCarry") return `Best: ${best.weight}${unit}${best.duration ? ` × ${best.duration}s` : ""}`;
+  return `Best: ${best.weight}${unit} × ${best.reps}`;
 }
 
 // Past sessions (most recent first) that included this exercise, with just
@@ -60,20 +85,27 @@ function recentPerformancesFor(exerciseName, limit = 5) {
     if (w.type === "cardio") return;
     w.exercises.forEach((ex) => {
       if (ex.exerciseName !== exerciseName) return;
-      const workingSets = ex.sets.filter((s) => !s.isWarmup && (s.weight != null || s.reps != null));
+      const workingSets = ex.sets.filter((s) => !s.isWarmup && (s.weight != null || s.reps != null || s.duration != null));
       if (workingSets.length) sessions.push({ date: w.date, sets: workingSets });
     });
   });
   return sessions.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, limit);
 }
 
-function renderRecentPerformancesHtml(exerciseName, unit) {
+function formatSetSummary(set, metricType, unit) {
+  if (metricType === "bodyweight") return `${set.reps} reps`;
+  if (metricType === "isometric") return `${set.duration}s`;
+  if (metricType === "loadedCarry") return `${set.weight}${unit}${set.duration ? ` × ${set.duration}s` : ""}`;
+  return set.weight != null ? `${set.weight}${unit}×${set.reps ?? "?"}` : `${set.reps} reps`;
+}
+
+function renderRecentPerformancesHtml(exerciseName, unit, metricType = "weighted") {
   const sessions = recentPerformancesFor(exerciseName);
   if (!sessions.length) return `<p class="muted small">No past sessions yet.</p>`;
   return sessions
     .map((s) => {
       const dateLabel = new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric" });
-      const setsLabel = s.sets.map((set) => (set.weight != null ? `${set.weight}${unit}×${set.reps ?? "?"}` : `${set.reps} reps`)).join(", ");
+      const setsLabel = s.sets.map((set) => formatSetSummary(set, metricType, unit)).join(", ");
       return `<div class="recent-performance-row"><span class="recent-performance-date">${escapeHtml(dateLabel)}</span><span>${escapeHtml(setsLabel)}</span></div>`;
     })
     .join("");
@@ -192,6 +224,44 @@ function suggestWarmups(ex) {
   renderExerciseList();
 }
 
+// What a set-row looks like for each logging type -- which inputs it shows
+// (in order), and the CSS column-count class that matches. "field" is the
+// property name on the set object; "kind" picks the input's type/step/
+// placeholder. Weighted (weight x reps) and Loaded Carry (weight x time)
+// both keep the full 5 columns; Bodyweight and Isometric drop to 4 since
+// there's one fewer input.
+function setRowFields(metricType, unit) {
+  switch (metricType) {
+    case "bodyweight":
+      return { cols: 4, fields: [{ field: "reps", kind: "reps", label: "Reps" }] };
+    case "isometric":
+      return { cols: 4, fields: [{ field: "duration", kind: "duration", label: "Time (s)" }] };
+    case "loadedCarry":
+      return {
+        cols: 5,
+        fields: [
+          { field: "weight", kind: "weight", label: `Weight (${unit})` },
+          { field: "duration", kind: "duration", label: "Time (s)" },
+        ],
+      };
+    default: // "weighted"
+      return {
+        cols: 5,
+        fields: [
+          { field: "reps", kind: "reps", label: "Reps" },
+          { field: "weight", kind: "weight", label: `Weight (${unit})` },
+        ],
+      };
+  }
+}
+
+function setFieldInputHtml(kind, value) {
+  if (kind === "reps") return `<input type="number" inputmode="numeric" min="0" placeholder="0" class="reps-input" value="${value ?? ""}">`;
+  if (kind === "weight") return `<input type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" class="weight-input" value="${value ?? ""}">`;
+  if (kind === "duration") return `<input type="number" inputmode="numeric" step="1" min="0" placeholder="0" class="duration-input" value="${value ?? ""}">`;
+  return "";
+}
+
 function renderExerciseList() {
   const wrap = $("#exerciseList");
   wrap.innerHTML = "";
@@ -211,7 +281,10 @@ function renderExerciseList() {
       const hasNext = exIdx < currentWorkout.exercises.length - 1;
       const isFirst = exIdx === 0;
       const isLast = exIdx === currentWorkout.exercises.length - 1;
-      const best = bestSetFor(ex.exerciseName);
+      const metricType = db.getExerciseMeta(ex.exerciseName).metricType || "weighted";
+      const best = bestSetFor(ex.exerciseName, metricType);
+      const rowConfig = setRowFields(metricType, unit);
+      const colsClass = rowConfig.cols === 4 ? " cols-4" : "";
       const card = document.createElement("div");
       card.className = "exercise-card";
       card.innerHTML = `
@@ -227,35 +300,35 @@ function renderExerciseList() {
         </div>
         ${
           best
-            ? `<button type="button" class="exercise-recent-toggle muted small" data-ex="${exIdx}">Best: ${best.weight}${unit} × ${best.reps} <span class="recent-toggle-hint">· Recent ▾</span></button>
+            ? `<button type="button" class="exercise-recent-toggle muted small" data-ex="${exIdx}">${formatBestSet(best, metricType, unit)} <span class="recent-toggle-hint">· Recent ▾</span></button>
                <div class="exercise-recent-performances" data-ex="${exIdx}" hidden></div>`
             : ""
         }
-        <div class="set-row-labels">
-          <span>#</span><span>Reps</span><span>Weight (${unit})</span><span>RPE</span><span>✓</span>
+        <div class="set-row-labels${colsClass}">
+          <span>#</span>${rowConfig.fields.map((f) => `<span>${escapeHtml(f.label)}</span>`).join("")}<span>RPE</span><span>✓</span>
         </div>
         <div class="sets-table" data-ex="${exIdx}"></div>
         <div class="exercise-card-footer">
           <button class="add-set-btn" data-ex="${exIdx}">+ Add set</button>
-          <button class="warmup-btn" data-ex="${exIdx}">✨ Add warm-ups</button>
+          ${metricType === "weighted" ? `<button class="warmup-btn" data-ex="${exIdx}">✨ Add warm-ups</button>` : ""}
         </div>
       `;
       const setsTable = $(".sets-table", card);
       ex.sets.forEach((set, setIdx) => {
         const row = document.createElement("div");
-        row.className = "set-row" + (set.isWarmup ? " warmup-row" : "");
+        row.className = "set-row" + colsClass + (set.isWarmup ? " warmup-row" : "");
         row.innerHTML = `
           <span class="set-index">${set.isWarmup ? "W" : setIdx + 1}</span>
-          <input type="number" inputmode="numeric" min="0" placeholder="0" class="reps-input" value="${set.reps ?? ""}">
-          <input type="number" inputmode="decimal" step="0.5" min="0" placeholder="0" class="weight-input" value="${set.weight ?? ""}">
+          ${rowConfig.fields.map((f) => setFieldInputHtml(f.kind, set[f.field])).join("")}
           <input type="number" inputmode="decimal" step="0.5" min="0" max="10" placeholder="—" class="rpe-input" value="${set.rpe ?? ""}">
           <button class="set-done ${set.done ? "checked" : ""}" data-ex="${exIdx}" data-set="${setIdx}">${set.done ? "✓" : ""}</button>
         `;
-        $(".weight-input", row).addEventListener("input", (e) => {
-          set.weight = e.target.value === "" ? null : parseFloat(e.target.value);
-        });
-        $(".reps-input", row).addEventListener("input", (e) => {
-          set.reps = e.target.value === "" ? null : parseInt(e.target.value, 10);
+        rowConfig.fields.forEach((f) => {
+          const selector = f.kind === "reps" ? ".reps-input" : f.kind === "weight" ? ".weight-input" : ".duration-input";
+          $(selector, row).addEventListener("input", (e) => {
+            const v = e.target.value === "" ? null : f.kind === "reps" || f.kind === "duration" ? parseInt(e.target.value, 10) : parseFloat(e.target.value);
+            set[f.field] = v;
+          });
         });
         $(".rpe-input", row).addEventListener("input", (e) => {
           set.rpe = e.target.value === "" ? null : parseFloat(e.target.value);
@@ -281,7 +354,7 @@ function renderExerciseList() {
     btn.addEventListener("click", () => {
       const ex = currentWorkout.exercises[+btn.dataset.ex];
       const last = ex.sets[ex.sets.length - 1];
-      ex.sets.push({ reps: last?.reps ?? null, weight: last?.weight ?? null, rpe: null, done: false });
+      ex.sets.push({ reps: last?.reps ?? null, weight: last?.weight ?? null, duration: last?.duration ?? null, rpe: null, done: false });
       renderExerciseList();
     })
   );
@@ -307,7 +380,8 @@ function renderExerciseList() {
         panel.hidden = true;
         return;
       }
-      panel.innerHTML = renderRecentPerformancesHtml(ex.exerciseName, db.getSettings().unit);
+      const metricType = db.getExerciseMeta(ex.exerciseName).metricType || "weighted";
+      panel.innerHTML = renderRecentPerformancesHtml(ex.exerciseName, db.getSettings().unit, metricType);
       panel.hidden = false;
     })
   );
@@ -1226,22 +1300,26 @@ function openExerciseForm(name = null, returnTo = "library") {
   exerciseFormState = { originalName: name, returnTo };
 
   $("#exerciseFormMovement").innerHTML = MOVEMENTS.map((m) => `<option value="${m.key}">${escapeHtml(m.label)}</option>`).join("");
+  $("#exerciseFormMetricType").innerHTML = METRIC_TYPES.map((m) => `<option value="${m.key}">${escapeHtml(m.label)}</option>`).join("");
 
   let movement = "isolation";
   let muscles = {};
   let athleticism = 0;
   let jointLoad = {};
+  let metricType = "weighted";
   if (!isNew) {
     const meta = db.getExerciseMeta(name);
     movement = meta.movement;
     muscles = meta.muscles || {};
     athleticism = meta.athleticism || 0;
     jointLoad = meta.jointLoad || {};
+    metricType = meta.metricType || "weighted";
   }
 
   $("#exerciseFormTitle").textContent = isNew ? "Add Exercise" : "Edit Exercise";
   $("#exerciseFormName").value = isNew ? "" : name;
   $("#exerciseFormMovement").value = movement;
+  $("#exerciseFormMetricType").value = metricType;
   $("#exerciseFormAthleticism").value = athleticism || "";
   JOINTS.forEach((j) => {
     $(`#exerciseFormJoint-${j.key}`).value = jointLoad[j.key] || "";
@@ -1287,6 +1365,7 @@ function initLibraryView() {
       return;
     }
     const movement = $("#exerciseFormMovement").value;
+    const metricType = $("#exerciseFormMetricType").value;
     const athleticism = parseFloat($("#exerciseFormAthleticism").value) || 0;
     const jointLoad = {};
     JOINTS.forEach((j) => {
@@ -1300,7 +1379,7 @@ function initLibraryView() {
     $$('input[data-muscle][data-group="secondary"]').forEach((cb) => {
       if (cb.checked && muscles[cb.dataset.muscle] !== 1) muscles[cb.dataset.muscle] = 0.5;
     });
-    db.saveCustomExercise({ name, movement, muscles, athleticism, jointLoad }, exerciseFormState.originalName);
+    db.saveCustomExercise({ name, movement, muscles, athleticism, jointLoad, metricType }, exerciseFormState.originalName);
     toast("Exercise saved ✓");
     refreshExerciseDatalist();
     if (exerciseFormState.returnTo === "log") renderExerciseList();

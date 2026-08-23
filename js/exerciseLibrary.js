@@ -68,7 +68,20 @@ export const JOINTS = [
 ];
 export const JOINT_LABEL = Object.fromEntries(JOINTS.map((j) => [j.key, j.label]));
 
-// name -> { movement, muscles: { muscleKey: fraction }, athleticism?, jointLoad? }
+// How a set of this exercise gets logged -- determines which fields the Log
+// view shows. "weighted" (the default, so it's absent on most entries) is
+// weight x reps, same as always. Cardio Machine (distance + time) isn't
+// here -- it's already fully covered by FitLog's separate Cardio workout
+// type, not a per-exercise thing.
+export const METRIC_TYPES = [
+  { key: "weighted", label: "Weighted (weight × reps)" },
+  { key: "bodyweight", label: "Bodyweight (reps only)" },
+  { key: "isometric", label: "Isometric Hold (time only)" },
+  { key: "loadedCarry", label: "Loaded Carry (weight × time)" },
+];
+export const METRIC_TYPE_LABEL = Object.fromEntries(METRIC_TYPES.map((m) => [m.key, m.label]));
+
+// name -> { movement, muscles: { muscleKey: fraction }, athleticism?, jointLoad?, metricType? }
 // athleticism (absent = 0) is a per-set credit toward Athleticism, in the
 // same "credited sets" spirit as muscle/movement volume above -- not a
 // free-floating score. A set of isolation work counts 0; an ordinary
@@ -90,7 +103,7 @@ export const BUILTIN_EXERCISES = {
   "Barbell Row": { movement: "horizontalPull", muscles: { upperBack: 1, lats: 0.5, biceps: 0.5, rearDelts: 0.5 }, athleticism: 0.2, jointLoad: { lowBack: 0.4, shoulders: 0.2 } },
   "Pull-Up": { movement: "verticalPull", muscles: { lats: 1, upperBack: 0.5, biceps: 0.5 }, athleticism: 0.3, jointLoad: { shoulders: 0.3 } },
   "Chin-Up": { movement: "verticalPull", muscles: { lats: 1, biceps: 1, upperBack: 0.5 }, athleticism: 0.3, jointLoad: { shoulders: 0.2 } },
-  "Push-Up": { movement: "horizontalPush", muscles: { chest: 1, triceps: 0.5, frontDelts: 0.5 }, athleticism: 0.2, jointLoad: { shoulders: 0.3 } },
+  "Push-Up": { movement: "horizontalPush", muscles: { chest: 1, triceps: 0.5, frontDelts: 0.5 }, athleticism: 0.2, jointLoad: { shoulders: 0.3 }, metricType: "bodyweight" },
   "Dip": { movement: "verticalPush", muscles: { triceps: 1, chest: 0.5, frontDelts: 0.5 }, athleticism: 0.2, jointLoad: { shoulders: 0.4 } },
   "Lat Pulldown": { movement: "verticalPull", muscles: { lats: 1, upperBack: 0.5, biceps: 0.5 }, jointLoad: { shoulders: 0.2 } },
   "Seated Cable Row": { movement: "horizontalPull", muscles: { upperBack: 1, lats: 0.5, biceps: 0.5 }, jointLoad: { shoulders: 0.1 } },
@@ -111,9 +124,9 @@ export const BUILTIN_EXERCISES = {
   "Walking Lunge": { movement: "lunge", muscles: { quadriceps: 1, glutes: 1, hamstrings: 0.5, adductors: 0.5, abductors: 0.5, hipFlexors: 0.5 }, athleticism: 0.3, jointLoad: { knees: 0.6, lowBack: 0.2 } },
   "Bulgarian Split Squat": { movement: "lunge", muscles: { quadriceps: 1, glutes: 1, hamstrings: 0.5, adductors: 0.5, abductors: 0.5 }, athleticism: 0.3, jointLoad: { knees: 0.7 } },
   "Calf Raise": { movement: "isolation", muscles: { calves: 1 }, jointLoad: { knees: 0.1 } },
-  "Plank": { movement: "core", muscles: { abs: 1, obliques: 0.5 }, jointLoad: { lowBack: 0.2 } },
+  "Plank": { movement: "core", muscles: { abs: 1, obliques: 0.5 }, jointLoad: { lowBack: 0.2 }, metricType: "isometric" },
   "Hanging Leg Raise": { movement: "core", muscles: { abs: 1, hipFlexors: 1, obliques: 0.5 }, jointLoad: { shoulders: 0.3, lowBack: 0.1 } },
-  "Side Plank": { movement: "core", muscles: { obliques: 1, abs: 0.5 }, jointLoad: { lowBack: 0.1 } },
+  "Side Plank": { movement: "core", muscles: { obliques: 1, abs: 0.5 }, jointLoad: { lowBack: 0.1 }, metricType: "isometric" },
   "Bird Dog": { movement: "core", muscles: { lowerBack: 1, abs: 0.5, glutes: 0.5 }, jointLoad: { lowBack: 0.2 } },
   "Sumo Deadlift": { movement: "hinge", muscles: { adductors: 1, glutes: 1, hamstrings: 0.5, spinalErectors: 0.5, quadriceps: 0.5 }, athleticism: 0.5, jointLoad: { lowBack: 0.8, knees: 0.3 } },
   "Hip Adduction Machine": { movement: "isolation", muscles: { adductors: 1 }, jointLoad: { knees: 0.1 } },
@@ -125,7 +138,7 @@ export const BUILTIN_EXERCISES = {
   "Front Raise": { movement: "isolation", muscles: { frontDelts: 1 }, jointLoad: { shoulders: 0.4 } },
   "Shrug": { movement: "isolation", muscles: { upperTraps: 1 } },
   "Good Morning": { movement: "hinge", muscles: { hamstrings: 1, spinalErectors: 1, glutes: 0.5 }, athleticism: 0.3, jointLoad: { lowBack: 0.9 } },
-  "Farmer's Carry": { movement: "isolation", muscles: { forearms: 1, upperTraps: 0.5, abs: 0.5 }, athleticism: 0.5, jointLoad: { lowBack: 0.3, shoulders: 0.2 } },
+  "Farmer's Carry": { movement: "isolation", muscles: { forearms: 1, upperTraps: 0.5, abs: 0.5 }, athleticism: 0.5, jointLoad: { lowBack: 0.3, shoulders: 0.2 }, metricType: "loadedCarry" },
 
   // Explosive/power movements -- jumps, throws, Olympic lifts, and similar.
   // Each one counts as a full set (1, same as compound lifts' 0.2-0.5 caps
@@ -154,4 +167,4 @@ export const BUILTIN_EXERCISES = {
   "Battle Ropes": { movement: "isolation", muscles: { frontDelts: 0.5, abs: 0.5, forearms: 0.5 }, athleticism: 1, jointLoad: { shoulders: 0.5 } },
 };
 
-export const EMPTY_META = { movement: "isolation", muscles: {}, athleticism: 0, jointLoad: {} };
+export const EMPTY_META = { movement: "isolation", muscles: {}, athleticism: 0, jointLoad: {}, metricType: "weighted" };
