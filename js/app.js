@@ -50,6 +50,35 @@ function bestSetFor(exerciseName) {
   return best;
 }
 
+// Past sessions (most recent first) that included this exercise, with just
+// its working sets -- for the "Recent" panel on the Log view's exercise
+// card, so PRs/recent performances are visible right where you're logging
+// instead of needing to navigate to Progress.
+function recentPerformancesFor(exerciseName, limit = 5) {
+  const sessions = [];
+  db.getWorkouts().forEach((w) => {
+    if (w.type === "cardio") return;
+    w.exercises.forEach((ex) => {
+      if (ex.exerciseName !== exerciseName) return;
+      const workingSets = ex.sets.filter((s) => !s.isWarmup && (s.weight != null || s.reps != null));
+      if (workingSets.length) sessions.push({ date: w.date, sets: workingSets });
+    });
+  });
+  return sessions.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, limit);
+}
+
+function renderRecentPerformancesHtml(exerciseName, unit) {
+  const sessions = recentPerformancesFor(exerciseName);
+  if (!sessions.length) return `<p class="muted small">No past sessions yet.</p>`;
+  return sessions
+    .map((s) => {
+      const dateLabel = new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const setsLabel = s.sets.map((set) => (set.weight != null ? `${set.weight}${unit}×${set.reps ?? "?"}` : `${set.reps} reps`)).join(", ");
+      return `<div class="recent-performance-row"><span class="recent-performance-date">${escapeHtml(dateLabel)}</span><span>${escapeHtml(setsLabel)}</span></div>`;
+    })
+    .join("");
+}
+
 // "7:42 /mi" style pace string from minutes + distance, or null if either is missing/zero.
 function formatPace(durationMin, distance, unit) {
   if (!durationMin || !distance) return null;
@@ -196,7 +225,12 @@ function renderExerciseList() {
             <button class="remove-exercise" data-ex="${exIdx}">Remove</button>
           </div>
         </div>
-        ${best ? `<p class="exercise-best-lift muted small">Best: ${best.weight}${unit} × ${best.reps}</p>` : ""}
+        ${
+          best
+            ? `<button type="button" class="exercise-recent-toggle muted small" data-ex="${exIdx}">Best: ${best.weight}${unit} × ${best.reps} <span class="recent-toggle-hint">· Recent ▾</span></button>
+               <div class="exercise-recent-performances" data-ex="${exIdx}" hidden></div>`
+            : ""
+        }
         <div class="set-row-labels">
           <span>#</span><span>Reps</span><span>Weight (${unit})</span><span>RPE</span><span>✓</span>
         </div>
@@ -263,6 +297,19 @@ function renderExerciseList() {
   );
   $$(".swap-exercise", wrap).forEach((btn) =>
     btn.addEventListener("click", () => startExerciseSwap(+btn.dataset.ex))
+  );
+  $$(".exercise-recent-toggle", wrap).forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const exIdx = +btn.dataset.ex;
+      const ex = currentWorkout.exercises[exIdx];
+      const panel = $(`.exercise-recent-performances[data-ex="${exIdx}"]`, wrap);
+      if (!panel.hidden) {
+        panel.hidden = true;
+        return;
+      }
+      panel.innerHTML = renderRecentPerformancesHtml(ex.exerciseName, db.getSettings().unit);
+      panel.hidden = false;
+    })
   );
   $$(".exercise-name-display", wrap).forEach((btn) =>
     btn.addEventListener("click", () => {
