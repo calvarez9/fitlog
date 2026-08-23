@@ -1,6 +1,6 @@
 // ---------- Weekly muscle & movement-pattern volume ----------
 import { getExerciseMeta } from "./db.js";
-import { MUSCLES, MOVEMENTS, MOVEMENT_LABEL, JOINTS } from "./exerciseLibrary.js";
+import { MUSCLES, MOVEMENTS_IN_VOLUME, MOVEMENT_LABEL, JOINTS } from "./exerciseLibrary.js";
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -29,7 +29,7 @@ export function getWeekRange(offset = 0) {
 // scale would be more misleading than honest).
 export function computeVolume(workouts, { start, end }) {
   const muscleTotals = Object.fromEntries(MUSCLES.map((m) => [m.key, 0]));
-  const movementTotals = Object.fromEntries(MOVEMENTS.map((m) => [m.key, 0]));
+  const movementTotals = Object.fromEntries(MOVEMENTS_IN_VOLUME.map((m) => [m.key, 0]));
   const jointTotals = Object.fromEntries(JOINTS.map((j) => [j.key, 0]));
   let strengthSets = 0;
   let athleticismScore = 0;
@@ -53,7 +53,11 @@ export function computeVolume(workouts, { start, end }) {
         strengthSets += setCount;
         const meta = getExerciseMeta(ex.exerciseName);
         athleticismScore += setCount * (meta.athleticism || 0);
-        movementTotals[meta.movement] = (movementTotals[meta.movement] || 0) + setCount;
+        // Isolation is a valid tag but deliberately excluded from Movement
+        // Pattern Volume -- see MOVEMENTS_IN_VOLUME in exerciseLibrary.js.
+        if (meta.movement !== "isolation") {
+          movementTotals[meta.movement] = (movementTotals[meta.movement] || 0) + setCount;
+        }
         Object.entries(meta.muscles || {}).forEach(([muscle, frac]) => {
           muscleTotals[muscle] = (muscleTotals[muscle] || 0) + setCount * frac;
         });
@@ -67,7 +71,7 @@ export function computeVolume(workouts, { start, end }) {
     .filter((r) => r.sets > 0)
     .sort((a, b) => b.sets - a.sets);
 
-  const movementRows = MOVEMENTS.map((m) => ({ key: m.key, label: MOVEMENT_LABEL[m.key], sets: round(movementTotals[m.key]) }))
+  const movementRows = MOVEMENTS_IN_VOLUME.map((m) => ({ key: m.key, label: MOVEMENT_LABEL[m.key], sets: round(movementTotals[m.key]) }))
     .filter((r) => r.sets > 0)
     .sort((a, b) => b.sets - a.sets);
 
