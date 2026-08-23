@@ -701,6 +701,7 @@ function renderHistory() {
       </div>
       <div class="history-card-summary">${workoutSummary(w)}</div>
       <div class="history-card-detail">
+        ${cardio ? "" : `<div class="history-card-bodymap bodymap-row" data-id="${w.id}"></div>`}
         ${detailHtml}
         ${w.notes ? `<div class="history-card-notes">"${escapeHtml(w.notes)}"</div>` : ""}
         <div class="history-card-actions">
@@ -712,6 +713,10 @@ function renderHistory() {
     card.addEventListener("click", (e) => {
       if (e.target.closest("button")) return;
       card.classList.toggle("expanded");
+      // Body map is built lazily on first expand, not for every card up
+      // front -- with a lot of history that's a lot of anatomical SVGs to
+      // build for cards that may never get opened.
+      if (card.classList.contains("expanded")) renderHistoryCardBodyMap(w);
     });
     listEl.appendChild(card);
   });
@@ -752,6 +757,35 @@ function renderHistory() {
       toast("Loaded into Log — edit & save");
     })
   );
+}
+
+// Where one workout's own work went -- same figure/coloring as the
+// aggregate Muscle Volume view in Progress, just scoped to this workout's
+// own sets. Built once per card, on its first expand (see renderHistory).
+function renderHistoryCardBodyMap(w) {
+  const wrap = document.querySelector(`.history-card-bodymap[data-id="${w.id}"]`);
+  if (!wrap || wrap.dataset.rendered) return;
+
+  const muscleTotals = Object.fromEntries(MUSCLES.map((m) => [m.key, 0]));
+  w.exercises.forEach((ex) => {
+    const meta = db.getExerciseMeta(ex.exerciseName);
+    ex.sets.forEach((s) => {
+      if (s.isWarmup) return;
+      Object.entries(meta.muscles || {}).forEach(([muscle, frac]) => {
+        muscleTotals[muscle] = (muscleTotals[muscle] || 0) + frac;
+      });
+    });
+  });
+  if (!Object.values(muscleTotals).some((v) => v > 0)) return;
+
+  wrap.dataset.rendered = "1";
+  wrap.innerHTML = `
+    <figure class="bodymap-figure"><svg viewBox="0 0 724 1448"></svg><figcaption>Front</figcaption></figure>
+    <figure class="bodymap-figure"><svg viewBox="724 0 724 1448"></svg><figcaption>Back</figcaption></figure>
+  `;
+  const [frontSvg, backSvg] = wrap.querySelectorAll("svg");
+  renderBodyMaps(frontSvg, backSvg);
+  applyVolumeColors(frontSvg, backSvg, muscleTotals);
 }
 
 function initHistoryView() {

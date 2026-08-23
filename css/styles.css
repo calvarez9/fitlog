@@ -350,6 +350,8 @@ input::placeholder { color: var(--text-muted); }
 }
 .history-card.expanded .history-card-detail { display: block; }
 .history-card-detail .ex-line { display: flex; justify-content: space-between; padding: 3px 0; }
+.history-card-bodymap { margin-bottom: 12px; }
+.history-card-bodymap:empty { display: none; }
 .history-card-actions { margin-top: 10px; display: flex; gap: 8px; }
 
 /* ---------- Routines ---------- */
