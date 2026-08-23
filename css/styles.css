@@ -204,6 +204,8 @@ input::placeholder { color: var(--text-muted); }
 .link-exercise.active { opacity: 1; }
 .swap-exercise { font-size: 15px; }
 .remove-exercise { white-space: nowrap; }
+.move-exercise-up, .move-exercise-down { font-size: 11px; }
+.move-exercise-up:disabled, .move-exercise-down:disabled { opacity: 0.25; cursor: default; }
 
 .swap-input-row { display: flex; gap: 6px; flex: 1; }
 .swap-input-row input { flex: 1; padding: 6px 8px; font-size: 14px; }
@@ -546,35 +548,6 @@ input::placeholder { color: var(--text-muted); }
 .tab-btn.active { color: var(--series-1); }
 .tab-icon { font-size: 19px; line-height: 1; }
 .tab-label { font-size: 10px; font-weight: 600; }
-
-/* ---------- Rest timer ---------- */
-.rest-timer {
-  position: fixed;
-  left: 0; right: 0;
-  bottom: calc(64px + env(safe-area-inset-bottom));
-  display: flex;
-  justify-content: center;
-  z-index: 30;
-  pointer-events: none;
-}
-.rest-timer[hidden] { display: none; }
-.rest-timer-inner {
-  pointer-events: auto;
-  background: var(--surface-1);
-  border: 1px solid var(--border);
-  box-shadow: 0 8px 24px rgba(0,0,0,0.18);
-  border-radius: var(--radius-l);
-  padding: 14px 18px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  position: relative;
-  min-width: 220px;
-}
-.rest-timer-display { font-size: 32px; font-weight: 700; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
-.rest-timer-controls { display: flex; gap: 8px; align-items: center; }
-.rest-timer-inner .icon-btn.small { position: absolute; top: 8px; right: 8px; }
 
 /* ---------- Toast ---------- */
 .toast {

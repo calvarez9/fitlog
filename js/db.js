@@ -32,7 +32,7 @@ function uid() {
 }
 
 // ---------- Settings ----------
-const DEFAULT_SETTINGS = { unit: "lb", restTimerDefault: 90, distanceUnit: "mi" };
+const DEFAULT_SETTINGS = { unit: "lb", distanceUnit: "mi" };
 
 export function getSettings() {
   return { ...DEFAULT_SETTINGS, ...read(KEYS.settings, {}) };

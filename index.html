@@ -17,7 +17,6 @@
 
   <header class="topbar">
     <h1 class="brand">FitLog</h1>
-    <button id="restTimerToggle" class="icon-btn" aria-label="Rest timer" title="Rest timer">⏱</button>
   </header>
 
   <main id="views">
@@ -174,14 +173,6 @@
       </div>
 
       <div class="settings-group">
-        <h3>Rest Timer Default</h3>
-        <div class="row">
-          <input id="restTimerDefault" type="number" min="10" step="5" value="90" />
-          <span class="muted">seconds</span>
-        </div>
-      </div>
-
-      <div class="settings-group">
         <h3>Exercise Library</h3>
         <p class="muted small">Manage exercises and the muscles/movement pattern each one trains — this feeds the Progress → Volume view.</p>
         <button id="openLibraryBtn" class="btn secondary">Manage Exercises</button>
@@ -294,19 +285,6 @@
       <span class="tab-icon">⚙</span><span class="tab-label">Settings</span>
     </button>
   </nav>
-
-  <div id="restTimer" class="rest-timer" hidden>
-    <div class="rest-timer-inner">
-      <button id="restTimerClose" class="icon-btn small" aria-label="Close timer">✕</button>
-      <div class="rest-timer-display" id="restTimerDisplay">01:30</div>
-      <div class="rest-timer-controls">
-        <button id="restTimerMinus" class="btn secondary small">−15s</button>
-        <button id="restTimerStartPause" class="btn primary small">Start</button>
-        <button id="restTimerPlus" class="btn secondary small">+15s</button>
-      </div>
-      <button id="restTimerReset" class="btn ghost small">Reset</button>
-    </div>
-  </div>
 
   <div id="toast" class="toast" hidden></div>
 

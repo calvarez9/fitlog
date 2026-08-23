@@ -1,5 +1,4 @@
 import * as db from "./db.js";
-import { initTimer } from "./timer.js";
 import { renderProgressChart } from "./charts.js";
 import { MUSCLES, MOVEMENTS, MOVEMENT_LABEL, JOINTS } from "./exerciseLibrary.js";
 import { getWeekRange, computeVolume } from "./volume.js";
@@ -181,6 +180,8 @@ function renderExerciseList() {
     group.indices.forEach((exIdx) => {
       const ex = currentWorkout.exercises[exIdx];
       const hasNext = exIdx < currentWorkout.exercises.length - 1;
+      const isFirst = exIdx === 0;
+      const isLast = exIdx === currentWorkout.exercises.length - 1;
       const best = bestSetFor(ex.exerciseName);
       const card = document.createElement("div");
       card.className = "exercise-card";
@@ -188,6 +189,8 @@ function renderExerciseList() {
         <div class="exercise-card-header">
           <h3 class="exercise-name-display" data-ex="${exIdx}">${escapeHtml(ex.exerciseName)}</h3>
           <div class="exercise-card-actions">
+            <button class="move-exercise-up" data-ex="${exIdx}" title="Move up" ${isFirst ? "disabled" : ""}>▲</button>
+            <button class="move-exercise-down" data-ex="${exIdx}" title="Move down" ${isLast ? "disabled" : ""}>▼</button>
             ${hasNext ? `<button class="link-exercise ${ex.linkedToNext ? "active" : ""}" data-ex="${exIdx}" title="Superset with next exercise">🔗</button>` : ""}
             <button class="swap-exercise" data-ex="${exIdx}" title="Swap exercise">⇄</button>
             <button class="remove-exercise" data-ex="${exIdx}">Remove</button>
@@ -227,9 +230,6 @@ function renderExerciseList() {
           set.done = !set.done;
           e.target.classList.toggle("checked", set.done);
           e.target.textContent = set.done ? "✓" : "";
-          if (set.done) {
-            openRestTimer(true);
-          }
         });
         setsTable.appendChild(row);
       });
@@ -263,6 +263,24 @@ function renderExerciseList() {
   );
   $$(".swap-exercise", wrap).forEach((btn) =>
     btn.addEventListener("click", () => startExerciseSwap(+btn.dataset.ex))
+  );
+  $$(".move-exercise-up", wrap).forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const i = +btn.dataset.ex;
+      if (i <= 0) return;
+      const [moved] = currentWorkout.exercises.splice(i, 1);
+      currentWorkout.exercises.splice(i - 1, 0, moved);
+      renderExerciseList();
+    })
+  );
+  $$(".move-exercise-down", wrap).forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const i = +btn.dataset.ex;
+      if (i >= currentWorkout.exercises.length - 1) return;
+      const [moved] = currentWorkout.exercises.splice(i, 1);
+      currentWorkout.exercises.splice(i + 1, 0, moved);
+      renderExerciseList();
+    })
   );
 }
 
@@ -1271,13 +1289,6 @@ function initSettingsView() {
     });
   });
 
-  $("#restTimerDefault").value = settings.restTimerDefault;
-  $("#restTimerDefault").addEventListener("change", (e) => {
-    const v = Math.max(10, parseInt(e.target.value, 10) || 90);
-    db.saveSettings({ restTimerDefault: v });
-    e.target.value = v;
-  });
-
   $("#exportBtn").addEventListener("click", () => {
     const data = db.exportAll();
     const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
@@ -1329,30 +1340,6 @@ function initSettingsView() {
   });
 }
 
-// ==================== REST TIMER (floating panel) ====================
-let restTimerCtl = null;
-
-function openRestTimer(autoStart = false) {
-  $("#restTimer").hidden = false;
-  if (autoStart) restTimerCtl.restart();
-}
-
-function initRestTimer() {
-  restTimerCtl = initTimer({
-    display: $("#restTimerDisplay"),
-    startPauseBtn: $("#restTimerStartPause"),
-    plusBtn: $("#restTimerPlus"),
-    minusBtn: $("#restTimerMinus"),
-    resetBtn: $("#restTimerReset"),
-  });
-  $("#restTimerToggle").addEventListener("click", () => {
-    $("#restTimer").hidden = !$("#restTimer").hidden;
-  });
-  $("#restTimerClose").addEventListener("click", () => {
-    $("#restTimer").hidden = true;
-  });
-}
-
 // ==================== INIT ====================
 function init() {
   initTabs();
@@ -1362,7 +1349,6 @@ function init() {
   initProgressView();
   initLibraryView();
   initSettingsView();
-  initRestTimer();
   initSync(); // background, doesn't block anything above
 
   if ("serviceWorker" in navigator) {
