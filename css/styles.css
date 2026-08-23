@@ -125,6 +125,8 @@ main#views {
   display: flex; align-items: center; justify-content: space-between;
 }
 
+.library-sort { width: auto; font-size: 13px; padding: 6px 8px; margin-bottom: 10px; }
+
 input[type="text"], input[type="number"], input[type="search"], select {
   font-family: var(--font);
   font-size: 15px;

@@ -73,8 +73,8 @@ export function getAllExerciseObjects() {
   return names.map((name) => {
     const custom = customByName.get(name);
     const builtin = BUILTIN_EXERCISES[name];
-    if (custom) return { name, movement: custom.movement, muscles: custom.muscles, athleticism: custom.athleticism || 0, jointLoad: custom.jointLoad || {}, isCustom: !builtin, isOverride: !!builtin };
-    return { name, movement: builtin.movement, muscles: builtin.muscles, athleticism: builtin.athleticism || 0, jointLoad: builtin.jointLoad || {}, isCustom: false, isOverride: false };
+    if (custom) return { name, movement: custom.movement, muscles: custom.muscles, athleticism: custom.athleticism || 0, jointLoad: custom.jointLoad || {}, isCustom: !builtin, isOverride: !!builtin, createdAt: custom.createdAt || 0 };
+    return { name, movement: builtin.movement, muscles: builtin.muscles, athleticism: builtin.athleticism || 0, jointLoad: builtin.jointLoad || {}, isCustom: false, isOverride: false, createdAt: 0 };
   });
 }
 
@@ -92,20 +92,24 @@ export function addCustomExercise(name) {
   if (!name) return;
   if (getExercises().some((e) => e.toLowerCase() === name.toLowerCase())) return;
   const custom = read(KEYS.exercises, []);
-  custom.push({ name, ...EMPTY_META, muscles: {} });
+  custom.push({ name, ...EMPTY_META, muscles: {}, createdAt: Date.now() });
   write(KEYS.exercises, custom);
   queueExerciseSync(name);
 }
 
 // Full add/edit from the Exercise Library: name + movement + muscles + athleticism + jointLoad.
-// Saving under a name that matches a builtin creates an override.
+// Saving under a name that matches a builtin creates an override. createdAt
+// is set once on first creation and carried forward on every edit after
+// that -- it's what "Recently Added" sorts by, so an edit shouldn't bump an
+// exercise back to the top as if it were new.
 export function saveCustomExercise({ name, movement, muscles, athleticism, jointLoad }, originalName = null) {
   name = name.trim();
   if (!name) throw new Error("Name required");
   const all = read(KEYS.exercises, []).map(normalizeCustom);
   const targetName = originalName || name;
   const idx = all.findIndex((e) => e.name === targetName);
-  const entry = { name, movement, muscles, athleticism: athleticism || 0, jointLoad: jointLoad || {} };
+  const createdAt = idx >= 0 ? all[idx].createdAt || Date.now() : Date.now();
+  const entry = { name, movement, muscles, athleticism: athleticism || 0, jointLoad: jointLoad || {}, createdAt };
   if (idx >= 0) all[idx] = entry;
   else all.push(entry);
   write(KEYS.exercises, all);

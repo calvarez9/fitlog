@@ -1124,6 +1124,7 @@ function initProgressView() {
 
 // ==================== EXERCISE LIBRARY ====================
 let exerciseFormState = { originalName: null };
+let librarySort = "name";
 
 function movementTagLabel(key) {
   return MOVEMENT_LABEL[key] || key;
@@ -1132,6 +1133,11 @@ function movementTagLabel(key) {
 function renderLibrary() {
   const listEl = $("#libraryList");
   const all = db.getAllExerciseObjects();
+  if (librarySort === "recent") {
+    all.sort((a, b) => b.createdAt - a.createdAt);
+  } else {
+    all.sort((a, b) => a.name.localeCompare(b.name));
+  }
   listEl.innerHTML = all
     .map((ex) => {
       const primary = MUSCLES.filter((m) => (ex.muscles || {})[m.key] === 1).map((m) => m.label);
@@ -1222,6 +1228,10 @@ function initLibraryView() {
   $("#libraryBackBtn").addEventListener("click", () => switchView("settings"));
   $("#exerciseFormBackBtn").addEventListener("click", () => switchView(exerciseFormState.returnTo || "library"));
   $("#newExerciseBtn").addEventListener("click", () => openExerciseForm(null));
+  $("#librarySort").addEventListener("change", (e) => {
+    librarySort = e.target.value;
+    renderLibrary();
+  });
 
   $("#exerciseFormSaveBtn").addEventListener("click", () => {
     const name = $("#exerciseFormName").value.trim();

@@ -1,6 +1,6 @@
 // ---------- Weekly muscle & movement-pattern volume ----------
 import { getExerciseMeta } from "./db.js";
-import { MUSCLES, MOVEMENTS_IN_VOLUME, MOVEMENT_LABEL, JOINTS } from "./exerciseLibrary.js";
+import { MUSCLES, MUSCLE_GROUPS, MOVEMENTS_IN_VOLUME, MOVEMENT_LABEL, JOINTS } from "./exerciseLibrary.js";
 
 function startOfWeek(date) {
   const d = new Date(date);
@@ -67,7 +67,15 @@ export function computeVolume(workouts, { start, end }) {
       });
     });
 
-  const muscleRows = MUSCLES.map((m) => ({ key: m.key, label: m.label, sets: round(muscleTotals[m.key]) }))
+  // Sub-muscles in a MUSCLE_GROUPS entry (upper/middle/lower traps) roll up
+  // into one row here -- FitLog's Volume tab has no click-through detail to
+  // reveal the split in (unlike the dashboard), so it's just always shown
+  // as the aggregate.
+  const groupedMuscleKeys = new Set(MUSCLE_GROUPS.flatMap((g) => g.members));
+  const muscleRows = [
+    ...MUSCLE_GROUPS.map((g) => ({ key: g.key, label: g.label, sets: round(g.members.reduce((sum, k) => sum + muscleTotals[k], 0)) })),
+    ...MUSCLES.filter((m) => !groupedMuscleKeys.has(m.key)).map((m) => ({ key: m.key, label: m.label, sets: round(muscleTotals[m.key]) })),
+  ]
     .filter((r) => r.sets > 0)
     .sort((a, b) => b.sets - a.sets);
 
