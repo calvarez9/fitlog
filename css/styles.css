@@ -203,6 +203,7 @@ input::placeholder { color: var(--text-muted); }
 .link-exercise { font-size: 15px; opacity: 0.5; }
 .link-exercise.active { opacity: 1; }
 .swap-exercise { font-size: 15px; }
+.edit-exercise-props { font-size: 15px; }
 .remove-exercise { white-space: nowrap; }
 .move-exercise-up, .move-exercise-down { font-size: 11px; }
 .move-exercise-up:disabled, .move-exercise-down:disabled { opacity: 0.25; cursor: default; }

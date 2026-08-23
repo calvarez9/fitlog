@@ -192,6 +192,7 @@ function renderExerciseList() {
             <button class="move-exercise-up" data-ex="${exIdx}" title="Move up" ${isFirst ? "disabled" : ""}>▲</button>
             <button class="move-exercise-down" data-ex="${exIdx}" title="Move down" ${isLast ? "disabled" : ""}>▼</button>
             ${hasNext ? `<button class="link-exercise ${ex.linkedToNext ? "active" : ""}" data-ex="${exIdx}" title="Superset with next exercise">🔗</button>` : ""}
+            <button class="edit-exercise-props" data-ex="${exIdx}" title="Edit movement/muscles/athleticism">✎</button>
             <button class="swap-exercise" data-ex="${exIdx}" title="Swap exercise">⇄</button>
             <button class="remove-exercise" data-ex="${exIdx}">Remove</button>
           </div>
@@ -263,6 +264,12 @@ function renderExerciseList() {
   );
   $$(".swap-exercise", wrap).forEach((btn) =>
     btn.addEventListener("click", () => startExerciseSwap(+btn.dataset.ex))
+  );
+  $$(".edit-exercise-props", wrap).forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const ex = currentWorkout.exercises[+btn.dataset.ex];
+      openExerciseForm(ex.exerciseName, "log");
+    })
   );
   $$(".move-exercise-up", wrap).forEach((btn) =>
     btn.addEventListener("click", () => {
@@ -1128,9 +1135,9 @@ function muscleGridHtml(containerId, checkedKeys) {
   ).join("");
 }
 
-function openExerciseForm(name = null) {
+function openExerciseForm(name = null, returnTo = "library") {
   const isNew = !name;
-  exerciseFormState = { originalName: name };
+  exerciseFormState = { originalName: name, returnTo };
 
   $("#exerciseFormMovement").innerHTML = MOVEMENTS.map((m) => `<option value="${m.key}">${escapeHtml(m.label)}</option>`).join("");
 
@@ -1180,7 +1187,7 @@ function openExerciseForm(name = null) {
 function initLibraryView() {
   $("#openLibraryBtn").addEventListener("click", () => switchView("library"));
   $("#libraryBackBtn").addEventListener("click", () => switchView("settings"));
-  $("#exerciseFormBackBtn").addEventListener("click", () => switchView("library"));
+  $("#exerciseFormBackBtn").addEventListener("click", () => switchView(exerciseFormState.returnTo || "library"));
   $("#newExerciseBtn").addEventListener("click", () => openExerciseForm(null));
 
   $("#exerciseFormSaveBtn").addEventListener("click", () => {
@@ -1206,7 +1213,8 @@ function initLibraryView() {
     db.saveCustomExercise({ name, movement, muscles, athleticism, jointLoad }, exerciseFormState.originalName);
     toast("Exercise saved ✓");
     refreshExerciseDatalist();
-    switchView("library");
+    if (exerciseFormState.returnTo === "log") renderExerciseList();
+    switchView(exerciseFormState.returnTo || "library");
   });
 
   $("#exerciseFormDeleteBtn").addEventListener("click", () => {
@@ -1214,7 +1222,8 @@ function initLibraryView() {
     db.deleteCustomExercise(exerciseFormState.originalName);
     toast("Exercise removed");
     refreshExerciseDatalist();
-    switchView("library");
+    if (exerciseFormState.returnTo === "log") renderExerciseList();
+    switchView(exerciseFormState.returnTo || "library");
   });
 }
 
