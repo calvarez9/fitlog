@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitlog-v6";
+const CACHE_NAME = "fitlog-v7";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -6,12 +6,13 @@ const APP_SHELL = [
   "./css/styles.css",
   "./js/app.js",
   "./js/db.js",
-  "./js/timer.js",
   "./js/charts.js",
   "./js/exerciseLibrary.js",
   "./js/cardioLibrary.js",
   "./js/volume.js",
   "./js/bodyMap.js",
+  "./js/supabaseClient.js",
+  "./js/sync.js",
   "./js/vendor/bodyFront.js",
   "./js/vendor/bodyBack.js",
   "./icons/icon-192.png",
