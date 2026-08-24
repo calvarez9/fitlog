@@ -65,6 +65,10 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
+/* Prevents the browser's native pull-to-refresh gesture -- a drag-down
+   reload would silently wipe an in-progress, unsaved workout draft
+   (currentWorkout only lives in memory until "Finish & Save Workout"). */
+html { overscroll-behavior-y: contain; }
 body {
   margin: 0;
   font-family: var(--font);
