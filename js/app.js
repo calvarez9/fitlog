@@ -38,10 +38,15 @@ function epley1RM(weight, reps) {
 // formula that covers weight x reps, a held time, a rep count, and a
 // weight x time carry all at once, so each type picks the metric that
 // actually answers "was this a PR" for that kind of set.
-function bestSetFor(exerciseName, metricType = "weighted") {
+// location: only applied when usesCableEquipment is true -- a barbell PR is
+// the same everywhere, but two gyms' cable stacks can genuinely differ, so
+// cable exercises' "best" is scoped to whichever gym you're currently
+// logging at instead of being a mixed-gym number.
+function bestSetFor(exerciseName, metricType = "weighted", usesCableEquipment = false, location = null) {
   let best = null;
   db.getWorkouts().forEach((w) => {
     if (w.type === "cardio") return;
+    if (usesCableEquipment && location && (w.location || null) !== location) return;
     w.exercises.forEach((ex) => {
       if (ex.exerciseName !== exerciseName) return;
       ex.sets.forEach((s) => {
@@ -68,17 +73,21 @@ function bestSetFor(exerciseName, metricType = "weighted") {
   return best;
 }
 
-function formatBestSet(best, metricType, unit) {
-  if (metricType === "bodyweight") return `Best: ${best.reps} reps`;
-  if (metricType === "isometric") return `Best: ${best.duration}s hold`;
-  if (metricType === "loadedCarry") return `Best: ${best.weight}${unit}${best.duration ? ` × ${best.duration}s` : ""}`;
-  return `Best: ${best.weight}${unit} × ${best.reps}`;
+function formatBestSet(best, metricType, unit, usesCableEquipment, location) {
+  const locationSuffix = usesCableEquipment && location ? ` at ${location}` : "";
+  if (metricType === "bodyweight") return `Best: ${best.reps} reps${locationSuffix}`;
+  if (metricType === "isometric") return `Best: ${best.duration}s hold${locationSuffix}`;
+  if (metricType === "loadedCarry") return `Best: ${best.weight}${unit}${best.duration ? ` × ${best.duration}s` : ""}${locationSuffix}`;
+  return `Best: ${best.weight}${unit} × ${best.reps}${locationSuffix}`;
 }
 
 // Past sessions (most recent first) that included this exercise, with just
 // its working sets -- for the "Recent" panel on the Log view's exercise
 // card, so PRs/recent performances are visible right where you're logging
-// instead of needing to navigate to Progress.
+// instead of needing to navigate to Progress. Location is carried on every
+// session regardless of exercise type -- only cable exercises' display
+// actually shows it (see renderRecentPerformancesHtml), but it costs
+// nothing to always collect.
 function recentPerformancesFor(exerciseName, limit = 5) {
   const sessions = [];
   db.getWorkouts().forEach((w) => {
@@ -86,7 +95,7 @@ function recentPerformancesFor(exerciseName, limit = 5) {
     w.exercises.forEach((ex) => {
       if (ex.exerciseName !== exerciseName) return;
       const workingSets = ex.sets.filter((s) => !s.isWarmup && (s.weight != null || s.reps != null || s.duration != null));
-      if (workingSets.length) sessions.push({ date: w.date, sets: workingSets });
+      if (workingSets.length) sessions.push({ date: w.date, location: w.location || null, sets: workingSets });
     });
   });
   return sessions.sort((a, b) => new Date(b.date) - new Date(a.date)).slice(0, limit);
@@ -99,14 +108,15 @@ function formatSetSummary(set, metricType, unit) {
   return set.weight != null ? `${set.weight}${unit}×${set.reps ?? "?"}` : `${set.reps} reps`;
 }
 
-function renderRecentPerformancesHtml(exerciseName, unit, metricType = "weighted") {
+function renderRecentPerformancesHtml(exerciseName, unit, metricType = "weighted", usesCableEquipment = false) {
   const sessions = recentPerformancesFor(exerciseName);
   if (!sessions.length) return `<p class="muted small">No past sessions yet.</p>`;
   return sessions
     .map((s) => {
       const dateLabel = new Date(s.date).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+      const dateWithLocation = usesCableEquipment && s.location ? `${dateLabel} · ${s.location}` : dateLabel;
       const setsLabel = s.sets.map((set) => formatSetSummary(set, metricType, unit)).join(", ");
-      return `<div class="recent-performance-row"><span class="recent-performance-date">${escapeHtml(dateLabel)}</span><span>${escapeHtml(setsLabel)}</span></div>`;
+      return `<div class="recent-performance-row"><span class="recent-performance-date">${escapeHtml(dateWithLocation)}</span><span>${escapeHtml(setsLabel)}</span></div>`;
     })
     .join("");
 }
@@ -281,8 +291,10 @@ function renderExerciseList() {
       const hasNext = exIdx < currentWorkout.exercises.length - 1;
       const isFirst = exIdx === 0;
       const isLast = exIdx === currentWorkout.exercises.length - 1;
-      const metricType = db.getExerciseMeta(ex.exerciseName).metricType || "weighted";
-      const best = bestSetFor(ex.exerciseName, metricType);
+      const exMeta = db.getExerciseMeta(ex.exerciseName);
+      const metricType = exMeta.metricType || "weighted";
+      const usesCableEquipment = !!exMeta.usesCableEquipment;
+      const best = bestSetFor(ex.exerciseName, metricType, usesCableEquipment, currentWorkout.location);
       const rowConfig = setRowFields(metricType, unit);
       const colsClass = rowConfig.cols === 4 ? " cols-4" : "";
       const card = document.createElement("div");
@@ -300,7 +312,7 @@ function renderExerciseList() {
         </div>
         ${
           best
-            ? `<button type="button" class="exercise-recent-toggle muted small" data-ex="${exIdx}">${formatBestSet(best, metricType, unit)} <span class="recent-toggle-hint">· Recent ▾</span></button>
+            ? `<button type="button" class="exercise-recent-toggle muted small" data-ex="${exIdx}">${formatBestSet(best, metricType, unit, usesCableEquipment, currentWorkout.location)} <span class="recent-toggle-hint">· Recent ▾</span></button>
                <div class="exercise-recent-performances" data-ex="${exIdx}" hidden></div>`
             : ""
         }
@@ -380,8 +392,8 @@ function renderExerciseList() {
         panel.hidden = true;
         return;
       }
-      const metricType = db.getExerciseMeta(ex.exerciseName).metricType || "weighted";
-      panel.innerHTML = renderRecentPerformancesHtml(ex.exerciseName, db.getSettings().unit, metricType);
+      const exMeta = db.getExerciseMeta(ex.exerciseName);
+      panel.innerHTML = renderRecentPerformancesHtml(ex.exerciseName, db.getSettings().unit, exMeta.metricType || "weighted", !!exMeta.usesCableEquipment);
       panel.hidden = false;
     })
   );
@@ -519,7 +531,7 @@ function renderCardioList() {
 }
 
 function resetLogForm() {
-  currentWorkout = { exercises: [] };
+  currentWorkout = { exercises: [], location: db.getSettings().lastLocation };
   currentCardio = { segments: [] };
   workoutStartedAt = null;
   $("#workoutName").value = "";
@@ -527,6 +539,18 @@ function resetLogForm() {
   renderExerciseList();
   renderCardioList();
   $("#workoutDate").textContent = fmtDate(new Date());
+  renderLocationSelect();
+}
+
+// Only meaningful for cable-machine exercises -- see usesCableEquipment in
+// exerciseLibrary.js. Defaults to whatever was last used (set*Location
+// below), so switching only takes action when you actually change gyms.
+function renderLocationSelect() {
+  const sel = $("#workoutLocation");
+  const locations = db.getLocations();
+  sel.innerHTML = locations.map((loc) => `<option value="${escapeHtml(loc)}">${escapeHtml(loc)}</option>`).join("");
+  sel.value = currentWorkout.location || locations[0];
+  currentWorkout.location = sel.value;
 }
 
 function setLogSubTab(sub) {
@@ -538,6 +562,15 @@ function setLogSubTab(sub) {
 
 function initLogView() {
   $("#workoutDate").textContent = fmtDate(new Date());
+  renderLocationSelect();
+  $("#workoutLocation").addEventListener("change", (e) => {
+    currentWorkout.location = e.target.value;
+    db.saveSettings({ lastLocation: e.target.value });
+    // Re-render so any cable exercise's Best/Recent immediately reflects
+    // the new location instead of staying stale until something else
+    // happens to trigger a re-render.
+    renderExerciseList();
+  });
 
   $$(".seg-btn", $("#logSubnav")).forEach((btn) =>
     btn.addEventListener("click", () => setLogSubTab(btn.dataset.sub))
@@ -601,7 +634,7 @@ function initLogView() {
         .map((ex) => ({
           exerciseName: ex.exerciseName,
           linkedToNext: !!ex.linkedToNext,
-          sets: ex.sets.filter((s) => s.weight != null || s.reps != null),
+          sets: ex.sets.filter((s) => s.weight != null || s.reps != null || s.duration != null),
         }))
         .filter((ex) => ex.sets.length > 0);
 
@@ -616,6 +649,7 @@ function initLogView() {
         durationMin,
         name,
         notes,
+        location: currentWorkout.location || null,
         exercises: loggedExercises,
       });
     } else {
@@ -868,12 +902,14 @@ function renderHistory() {
           exercises: w.exercises.map((ex) => ({
             exerciseName: ex.exerciseName,
             linkedToNext: !!ex.linkedToNext,
-            sets: ex.sets.filter((s) => !s.isWarmup).map((s) => ({ reps: s.reps, weight: s.weight, rpe: null, done: false })),
+            sets: ex.sets.filter((s) => !s.isWarmup).map((s) => ({ reps: s.reps, weight: s.weight, duration: s.duration, rpe: null, done: false })),
           })),
+          location: db.getSettings().lastLocation,
         };
         renderExerciseList();
         setLogSubTab("strength");
       }
+      renderLocationSelect();
       switchView("log");
       toast("Loaded into Log — edit & save");
     })
@@ -1307,6 +1343,7 @@ function openExerciseForm(name = null, returnTo = "library") {
   let athleticism = 0;
   let jointLoad = {};
   let metricType = "weighted";
+  let usesCableEquipment = false;
   if (!isNew) {
     const meta = db.getExerciseMeta(name);
     movement = meta.movement;
@@ -1314,12 +1351,14 @@ function openExerciseForm(name = null, returnTo = "library") {
     athleticism = meta.athleticism || 0;
     jointLoad = meta.jointLoad || {};
     metricType = meta.metricType || "weighted";
+    usesCableEquipment = !!meta.usesCableEquipment;
   }
 
   $("#exerciseFormTitle").textContent = isNew ? "Add Exercise" : "Edit Exercise";
   $("#exerciseFormName").value = isNew ? "" : name;
   $("#exerciseFormMovement").value = movement;
   $("#exerciseFormMetricType").value = metricType;
+  $("#exerciseFormCable").checked = usesCableEquipment;
   $("#exerciseFormAthleticism").value = athleticism || "";
   JOINTS.forEach((j) => {
     $(`#exerciseFormJoint-${j.key}`).value = jointLoad[j.key] || "";
@@ -1366,6 +1405,7 @@ function initLibraryView() {
     }
     const movement = $("#exerciseFormMovement").value;
     const metricType = $("#exerciseFormMetricType").value;
+    const usesCableEquipment = $("#exerciseFormCable").checked;
     const athleticism = parseFloat($("#exerciseFormAthleticism").value) || 0;
     const jointLoad = {};
     JOINTS.forEach((j) => {
@@ -1379,7 +1419,7 @@ function initLibraryView() {
     $$('input[data-muscle][data-group="secondary"]').forEach((cb) => {
       if (cb.checked && muscles[cb.dataset.muscle] !== 1) muscles[cb.dataset.muscle] = 0.5;
     });
-    db.saveCustomExercise({ name, movement, muscles, athleticism, jointLoad, metricType }, exerciseFormState.originalName);
+    db.saveCustomExercise({ name, movement, muscles, athleticism, jointLoad, metricType, usesCableEquipment }, exerciseFormState.originalName);
     toast("Exercise saved ✓");
     refreshExerciseDatalist();
     if (exerciseFormState.returnTo === "log") renderExerciseList();
@@ -1446,9 +1486,45 @@ function initSyncSettings() {
   });
 }
 
+function renderLocationsList() {
+  const listEl = $("#locationsList");
+  const locations = db.getLocations();
+  listEl.innerHTML = locations
+    .map(
+      (loc) =>
+        `<div class="location-row"><span>${escapeHtml(loc)}</span><button class="icon-btn small remove-location-btn" data-loc="${escapeHtml(loc)}" aria-label="Remove ${escapeHtml(loc)}">✕</button></div>`
+    )
+    .join("");
+  $$(".remove-location-btn", listEl).forEach((btn) =>
+    btn.addEventListener("click", () => {
+      const locations = db.getLocations().filter((l) => l !== btn.dataset.loc);
+      if (!locations.length) {
+        toast("Keep at least one location");
+        return;
+      }
+      db.saveLocations(locations);
+      renderLocationsList();
+    })
+  );
+}
+
 function initSettingsView() {
   const settings = db.getSettings();
   initSyncSettings();
+  renderLocationsList();
+  $("#addLocationBtn").addEventListener("click", () => {
+    const input = $("#newLocationInput");
+    const name = input.value.trim();
+    if (!name) return;
+    const locations = db.getLocations();
+    if (locations.some((l) => l.toLowerCase() === name.toLowerCase())) {
+      toast("That location already exists");
+      return;
+    }
+    db.saveLocations([...locations, name]);
+    input.value = "";
+    renderLocationsList();
+  });
   $$(".seg-btn", $("#unitSegmented")).forEach((btn) => {
     btn.classList.toggle("active", btn.dataset.unit === settings.unit);
     btn.addEventListener("click", () => {

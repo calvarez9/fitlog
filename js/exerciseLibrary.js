@@ -105,8 +105,8 @@ export const BUILTIN_EXERCISES = {
   "Chin-Up": { movement: "verticalPull", muscles: { lats: 1, biceps: 1, upperBack: 0.5 }, athleticism: 0.3, jointLoad: { shoulders: 0.2 } },
   "Push-Up": { movement: "horizontalPush", muscles: { chest: 1, triceps: 0.5, frontDelts: 0.5 }, athleticism: 0.2, jointLoad: { shoulders: 0.3 }, metricType: "bodyweight" },
   "Dip": { movement: "verticalPush", muscles: { triceps: 1, chest: 0.5, frontDelts: 0.5 }, athleticism: 0.2, jointLoad: { shoulders: 0.4 } },
-  "Lat Pulldown": { movement: "verticalPull", muscles: { lats: 1, upperBack: 0.5, biceps: 0.5 }, jointLoad: { shoulders: 0.2 } },
-  "Seated Cable Row": { movement: "horizontalPull", muscles: { upperBack: 1, lats: 0.5, biceps: 0.5 }, jointLoad: { shoulders: 0.1 } },
+  "Lat Pulldown": { movement: "verticalPull", muscles: { lats: 1, upperBack: 0.5, biceps: 0.5 }, jointLoad: { shoulders: 0.2 }, usesCableEquipment: true },
+  "Seated Cable Row": { movement: "horizontalPull", muscles: { upperBack: 1, lats: 0.5, biceps: 0.5 }, jointLoad: { shoulders: 0.1 }, usesCableEquipment: true },
   "Incline Bench Press": { movement: "horizontalPush", muscles: { chest: 1, frontDelts: 0.5, triceps: 0.5 }, athleticism: 0.2, jointLoad: { shoulders: 0.4 } },
   "Dumbbell Bench Press": { movement: "horizontalPush", muscles: { chest: 1, triceps: 0.5, frontDelts: 0.5 }, athleticism: 0.2, jointLoad: { shoulders: 0.3 } },
   "Dumbbell Shoulder Press": { movement: "verticalPush", muscles: { frontDelts: 1, middleDelts: 0.5, triceps: 0.5 }, athleticism: 0.2, jointLoad: { shoulders: 0.8 } },
@@ -114,7 +114,7 @@ export const BUILTIN_EXERCISES = {
   "Dumbbell Curl": { movement: "isolation", muscles: { biceps: 1, forearms: 0.5 } },
   "Barbell Curl": { movement: "isolation", muscles: { biceps: 1, forearms: 0.5 } },
   "Hammer Curl": { movement: "isolation", muscles: { biceps: 1, forearms: 0.5 } },
-  "Tricep Pushdown": { movement: "isolation", muscles: { triceps: 1 } },
+  "Tricep Pushdown": { movement: "isolation", muscles: { triceps: 1 }, usesCableEquipment: true },
   "Skull Crusher": { movement: "isolation", muscles: { triceps: 1 } },
   "Leg Press": { movement: "squat", muscles: { quadriceps: 1, glutes: 0.5, hamstrings: 0.5, adductors: 0.5 }, athleticism: 0.2, jointLoad: { knees: 0.7 } },
   "Leg Curl": { movement: "isolation", muscles: { hamstrings: 1 }, jointLoad: { knees: 0.2 } },
@@ -132,8 +132,8 @@ export const BUILTIN_EXERCISES = {
   "Hip Adduction Machine": { movement: "isolation", muscles: { adductors: 1 }, jointLoad: { knees: 0.1 } },
   "Hip Abduction Machine": { movement: "isolation", muscles: { abductors: 1 }, jointLoad: { knees: 0.1 } },
   "Standing Cable Hip Flexion": { movement: "isolation", muscles: { hipFlexors: 1 } },
-  "Cable Fly": { movement: "horizontalPush", muscles: { chest: 1 }, jointLoad: { shoulders: 0.3 } },
-  "Face Pull": { movement: "horizontalPull", muscles: { rearDelts: 1, upperBack: 0.5 }, jointLoad: { shoulders: 0.2 } },
+  "Cable Fly": { movement: "horizontalPush", muscles: { chest: 1 }, jointLoad: { shoulders: 0.3 }, usesCableEquipment: true },
+  "Face Pull": { movement: "horizontalPull", muscles: { rearDelts: 1, upperBack: 0.5 }, jointLoad: { shoulders: 0.2 }, usesCableEquipment: true },
   "Lateral Raise": { movement: "isolation", muscles: { middleDelts: 1 }, jointLoad: { shoulders: 0.4 } },
   "Front Raise": { movement: "isolation", muscles: { frontDelts: 1 }, jointLoad: { shoulders: 0.4 } },
   "Shrug": { movement: "isolation", muscles: { upperTraps: 1 } },
@@ -167,4 +167,4 @@ export const BUILTIN_EXERCISES = {
   "Battle Ropes": { movement: "isolation", muscles: { frontDelts: 0.5, abs: 0.5, forearms: 0.5 }, athleticism: 1, jointLoad: { shoulders: 0.5 } },
 };
 
-export const EMPTY_META = { movement: "isolation", muscles: {}, athleticism: 0, jointLoad: {}, metricType: "weighted" };
+export const EMPTY_META = { movement: "isolation", muscles: {}, athleticism: 0, jointLoad: {}, metricType: "weighted", usesCableEquipment: false };

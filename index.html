@@ -32,6 +32,7 @@
         <div class="workout-meta">
           <input id="workoutName" type="text" placeholder="Workout name (optional)" />
           <span id="workoutDate" class="muted"></span>
+          <select id="workoutLocation" class="workout-location-select" title="Location (used for cable-machine PRs)"></select>
         </div>
       </div>
 
@@ -179,6 +180,16 @@
       </div>
 
       <div class="settings-group">
+        <h3>Locations</h3>
+        <p class="muted small">Only matters for exercises tagged "Uses cable equipment" — two gyms' cable stacks can feel different, so those PRs are tracked per location instead of one mixed-gym number.</p>
+        <div id="locationsList" class="locations-list"></div>
+        <div class="row">
+          <input type="text" id="newLocationInput" placeholder="Add a location…" />
+          <button id="addLocationBtn" class="btn secondary">+ Add</button>
+        </div>
+      </div>
+
+      <div class="settings-group">
         <h3>Cloud Sync</h3>
         <p class="muted small">Signs your workouts and exercise library to the Fitness Dashboard automatically, in the background. Logging still works fully offline either way -- anything logged without a connection just syncs the next time you're online.</p>
         <div id="syncSignedOut">
@@ -246,6 +257,9 @@
         <div>
           <div class="field-label">Log type</div>
           <select id="exerciseFormMetricType"></select>
+        </div>
+        <div>
+          <label class="checkbox-field"><input type="checkbox" id="exerciseFormCable" /> Uses cable equipment (PR tracked per location)</label>
         </div>
         <div>
           <div class="field-label">Athleticism (0 = none, 0.2–0.5 = compound, 1 = explosive/power)</div>
