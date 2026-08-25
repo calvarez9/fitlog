@@ -4,6 +4,18 @@ import { MUSCLES, MOVEMENTS, MOVEMENT_LABEL, JOINTS, METRIC_TYPES } from "./exer
 import { getWeekRange, computeVolume } from "./volume.js";
 import { renderBodyMaps, applyVolumeColors } from "./bodyMap.js";
 import { initSync, isSignedIn, signIn, signOut, flushSyncQueue, pendingCount } from "./sync.js";
+import { loadCloudHistory, getCloudWorkouts, onCloudHistoryLoaded } from "./cloudHistory.js";
+
+// Local history plus whatever's in the cloud (a Boostcamp import, or
+// another device) that never touched this browser's storage -- deduped by
+// id, since a workout logged here and already synced up would otherwise
+// show up twice. Local wins on a collision; it's the richer/authoritative
+// copy for anything actually logged in FitLog itself.
+function allWorkouts() {
+  const local = db.getWorkouts();
+  const localIds = new Set(local.map((w) => w.id));
+  return [...local, ...getCloudWorkouts().filter((w) => !localIds.has(w.id))];
+}
 
 // ==================== Helpers ====================
 const $ = (sel, root = document) => root.querySelector(sel);
@@ -44,7 +56,7 @@ function epley1RM(weight, reps) {
 // logging at instead of being a mixed-gym number.
 function bestSetFor(exerciseName, metricType = "weighted", usesCableEquipment = false, location = null) {
   let best = null;
-  db.getWorkouts().forEach((w) => {
+  allWorkouts().forEach((w) => {
     if (w.type === "cardio") return;
     if (usesCableEquipment && location && (w.location || null) !== location) return;
     w.exercises.forEach((ex) => {
@@ -90,7 +102,7 @@ function formatBestSet(best, metricType, unit, usesCableEquipment, location) {
 // nothing to always collect.
 function recentPerformancesFor(exerciseName, limit = 5) {
   const sessions = [];
-  db.getWorkouts().forEach((w) => {
+  allWorkouts().forEach((w) => {
     if (w.type === "cardio") return;
     w.exercises.forEach((ex) => {
       if (ex.exerciseName !== exerciseName) return;
@@ -314,7 +326,10 @@ function renderExerciseList() {
           best
             ? `<button type="button" class="exercise-recent-toggle muted small" data-ex="${exIdx}">${formatBestSet(best, metricType, unit, usesCableEquipment, currentWorkout.location)} <span class="recent-toggle-hint">· Recent ▾</span></button>
                <div class="exercise-recent-performances" data-ex="${exIdx}" hidden></div>`
-            : ""
+            : // No history anywhere (local or cloud) -- say so plainly instead
+              // of rendering nothing, so the exercise name above (which opens
+              // the editor, not history) isn't the only tappable text here.
+              `<p class="muted small exercise-no-history">No past sessions yet.</p>`
         }
         <div class="set-row-labels${colsClass}">
           <span>#</span>${rowConfig.fields.map((f) => `<span>${escapeHtml(f.label)}</span>`).join("")}<span>RPE</span><span>✓</span>
@@ -1604,6 +1619,11 @@ function init() {
   initLibraryView();
   initSettingsView();
   initSync(); // background, doesn't block anything above
+  // Also background -- the Log view already rendered with local-only
+  // history by the time this resolves; re-render once it's in so
+  // Best:/Recent picks up anything that only exists in the cloud
+  // (a Boostcamp import, or another device) without the user waiting on it.
+  loadCloudHistory().then(() => renderExerciseList());
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
