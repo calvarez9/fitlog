@@ -5,6 +5,7 @@ import { getWeekRange, computeVolume } from "./volume.js";
 import { renderBodyMaps, applyVolumeColors } from "./bodyMap.js";
 import { initSync, isSignedIn, signIn, signOut, flushSyncQueue, pendingCount } from "./sync.js";
 import { loadCloudHistory, getCloudWorkouts, onCloudHistoryLoaded } from "./cloudHistory.js";
+import { namesMatch } from "./nameMatch.js";
 
 // Local history plus whatever's in the cloud (a Boostcamp import, or
 // another device) that never touched this browser's storage -- deduped by
@@ -60,7 +61,7 @@ function bestSetFor(exerciseName, metricType = "weighted", usesCableEquipment = 
     if (w.type === "cardio") return;
     if (usesCableEquipment && location && (w.location || null) !== location) return;
     w.exercises.forEach((ex) => {
-      if (ex.exerciseName !== exerciseName) return;
+      if (!namesMatch(ex.exerciseName, exerciseName)) return;
       ex.sets.forEach((s) => {
         if (s.isWarmup) return;
         if (metricType === "bodyweight") {
@@ -105,7 +106,7 @@ function recentPerformancesFor(exerciseName, limit = 5) {
   allWorkouts().forEach((w) => {
     if (w.type === "cardio") return;
     w.exercises.forEach((ex) => {
-      if (ex.exerciseName !== exerciseName) return;
+      if (!namesMatch(ex.exerciseName, exerciseName)) return;
       const workingSets = ex.sets.filter((s) => !s.isWarmup && (s.weight != null || s.reps != null || s.duration != null));
       if (workingSets.length) sessions.push({ date: w.date, location: w.location || null, sets: workingSets });
     });

@@ -1,4 +1,4 @@
-const CACHE_NAME = "fitlog-v18";
+const CACHE_NAME = "fitlog-v19";
 const APP_SHELL = [
   "./",
   "./index.html",
@@ -14,6 +14,7 @@ const APP_SHELL = [
   "./js/supabaseClient.js",
   "./js/sync.js",
   "./js/cloudHistory.js",
+  "./js/nameMatch.js",
   "./js/vendor/bodyFront.js",
   "./js/vendor/bodyBack.js",
   "./icons/icon-192.png",
