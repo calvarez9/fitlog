@@ -1628,7 +1628,32 @@ function init() {
 
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
-      navigator.serviceWorker.register("sw.js").catch((err) => console.warn("SW registration failed", err));
+      navigator.serviceWorker
+        .register("sw.js")
+        .then((reg) => {
+          // sw.js's install handler calls skipWaiting() and activate calls
+          // clients.claim() -- a new version takes control of already-open
+          // pages almost immediately after it finishes installing. Without
+          // this reload, "taking control" is silent: the page keeps running
+          // whatever JS it already loaded into memory until the user
+          // happens to fully close and relaunch the app, which is exactly
+          // why a fix can show up on a laptop (a plain reload re-checks)
+          // but not a phone (a backgrounded PWA doesn't).
+          let refreshed = false;
+          navigator.serviceWorker.addEventListener("controllerchange", () => {
+            if (refreshed) return;
+            refreshed = true;
+            window.location.reload();
+          });
+          // A standalone iOS PWA can sit suspended for days without ever
+          // making a fresh network request that would let the browser
+          // notice a new sw.js exists -- explicitly ask on every return to
+          // the app instead of waiting for that to happen on its own.
+          document.addEventListener("visibilitychange", () => {
+            if (!document.hidden) reg.update().catch(() => {});
+          });
+        })
+        .catch((err) => console.warn("SW registration failed", err));
     });
   }
 }
