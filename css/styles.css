@@ -65,9 +65,11 @@
 
 * { box-sizing: border-box; }
 html, body { height: 100%; }
-/* Prevents the browser's native pull-to-refresh gesture -- a drag-down
-   reload would silently wipe an in-progress, unsaved workout draft
-   (currentWorkout only lives in memory until "Finish & Save Workout"). */
+/* Kept for Android Chrome, where pull-to-refresh is a window-level
+   gesture this actually reaches even though html itself never scrolls.
+   Does nothing on iOS Safari (the actual pull-to-refresh guard for that
+   is the JS touch handler on main#views -- see app.js) but is harmless
+   to leave here. */
 html { overscroll-behavior-y: contain; }
 body {
   margin: 0;
@@ -80,7 +82,14 @@ body {
 #app {
   max-width: 560px;
   margin: 0 auto;
-  min-height: 100dvh;
+  /* Was min-height, which only sets a floor -- #app was still free to
+     grow taller than the screen to fit a long exercise list, which
+     defeats main#views's flex:1/min-height:0/overflow-y:auto entirely
+     (there's no fixed budget left for it to clip into). A real height
+     both fills the screen for short content (same as min-height did)
+     AND caps it for long content, so #views is what scrolls instead of
+     the whole page. */
+  height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--surface-2);
@@ -115,13 +124,28 @@ body {
 /* ---------- Main / views ---------- */
 main#views {
   flex: 1;
+  /* A flex item defaults to min-height:auto, which refuses to shrink
+     below its own content's height -- without this override, #views
+     never actually clips to the available space, #app (and the whole
+     document) just grows taller than the viewport instead, and it's the
+     DOCUMENT that ends up scrolling rather than #views itself. That's a
+     real bug independent of the pull-to-refresh saga below: #views was
+     never reliably the scroll container this file's other rules (and the
+     touch guard in app.js) assume it is. */
+  min-height: 0;
   padding: 16px 16px calc(96px + env(safe-area-inset-bottom));
   overflow-y: auto;
-  /* This, not html's, is the element that actually scrolls (#app is a
-     100dvh flex column with overflow happening in here) -- the rule on
-     html a few lines up never touched the real pull-to-refresh gesture
-     because html itself never scrolls. This is the one that matters. */
-  overscroll-behavior-y: contain;
+  /* overscroll-behavior-y: contain was tried here (this, not html, is the
+     element that actually scrolls) but iOS Safari in standalone/PWA mode
+     has a real bug where that property on the actively-scrolling element
+     can swallow touch-scrolling entirely, not just the bounce at the
+     boundary -- confirmed the hard way. Pull-to-refresh is blocked with a
+     JS touch handler instead (see app.js, initPullToRefreshGuard), which
+     only intervenes in the exact "already at the top, dragging down"
+     case and leaves normal scrolling completely untouched.
+     -webkit-overflow-scrolling: touch keeps momentum scrolling smooth,
+     since a manual touchmove handler nearby can sometimes suppress it. */
+  -webkit-overflow-scrolling: touch;
 }
 .view-header {
   display: flex;

@@ -1610,9 +1610,33 @@ function initSettingsView() {
   });
 }
 
+// CSS overscroll-behavior-y on #views (the actual scrolling element) was
+// tried first, but iOS Safari in standalone/PWA mode has a real bug where
+// that property on the actively-scrolling element can swallow
+// touch-scrolling entirely, not just the bounce/refresh at the boundary --
+// confirmed on a real device. This only intervenes in the exact "already
+// at the top, dragging further down" case (the actual trigger for
+// pull-to-refresh); any other drag -- scrolled down at all, or dragging
+// up -- reaches native scrolling completely untouched.
+function initPullToRefreshGuard() {
+  const el = $("#views");
+  if (!el) return;
+  let startY = 0;
+  el.addEventListener("touchstart", (e) => { startY = e.touches[0].clientY; }, { passive: true });
+  el.addEventListener(
+    "touchmove",
+    (e) => {
+      const draggingDown = e.touches[0].clientY - startY > 0;
+      if (el.scrollTop <= 0 && draggingDown) e.preventDefault();
+    },
+    { passive: false }
+  );
+}
+
 // ==================== INIT ====================
 function init() {
   initTabs();
+  initPullToRefreshGuard();
   initLogView();
   initHistoryView();
   initRoutinesView();
