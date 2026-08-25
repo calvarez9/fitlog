@@ -117,6 +117,11 @@ main#views {
   flex: 1;
   padding: 16px 16px calc(96px + env(safe-area-inset-bottom));
   overflow-y: auto;
+  /* This, not html's, is the element that actually scrolls (#app is a
+     100dvh flex column with overflow happening in here) -- the rule on
+     html a few lines up never touched the real pull-to-refresh gesture
+     because html itself never scrolls. This is the one that matters. */
+  overscroll-behavior-y: contain;
 }
 .view-header {
   display: flex;
