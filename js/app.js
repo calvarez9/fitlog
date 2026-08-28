@@ -86,6 +86,25 @@ function bestSetFor(exerciseName, metricType = "weighted", usesCableEquipment = 
   return best;
 }
 
+// Is THIS set, on its own, better than every past (saved) session's best
+// for this exercise? Deliberately checked independently per set rather
+// than "best set so far in today's still-unsaved workout" -- two sets in
+// one session can each be a legitimate PR in their own right (different
+// rep ranges, etc.), and bestSetFor() only ever looks at already-saved
+// history anyway, so there's no double-counting risk either way.
+function isSetPR(exerciseName, set, metricType, usesCableEquipment, location) {
+  const best = bestSetFor(exerciseName, metricType, usesCableEquipment, location);
+  if (metricType === "bodyweight") return set.reps != null && (!best || set.reps > best.reps);
+  if (metricType === "isometric") return set.duration != null && (!best || set.duration > best.duration);
+  if (metricType === "loadedCarry") {
+    if (set.weight == null) return false;
+    return !best || set.weight > best.weight || (set.weight === best.weight && (set.duration || 0) > (best.duration || 0));
+  }
+  if (set.weight == null) return false;
+  const oneRM = epley1RM(set.weight, set.reps || 1);
+  return !best || oneRM > best.oneRM;
+}
+
 function formatBestSet(best, metricType, unit, usesCableEquipment, location) {
   const locationSuffix = usesCableEquipment && location ? ` at ${location}` : "";
   if (metricType === "bodyweight") return `Best: ${best.reps} reps${locationSuffix}`;
@@ -363,8 +382,11 @@ function renderExerciseList() {
         });
         $(".set-done", row).addEventListener("click", (e) => {
           set.done = !set.done;
+          const isPR = set.done && isSetPR(ex.exerciseName, set, metricType, usesCableEquipment, currentWorkout.location);
           e.target.classList.toggle("checked", set.done);
-          e.target.textContent = set.done ? "✓" : "";
+          e.target.classList.toggle("pr", isPR);
+          e.target.textContent = isPR ? "🏆" : set.done ? "✓" : "";
+          e.target.title = isPR ? "New PR!" : "";
         });
         setsTable.appendChild(row);
       });

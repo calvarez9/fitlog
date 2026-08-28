@@ -318,6 +318,12 @@ input::placeholder { color: var(--text-muted); }
   border-color: var(--good);
   color: #fff;
 }
+.set-row .set-done.pr {
+  background: var(--warning);
+  border-color: var(--warning);
+  color: #1a1a19;
+  font-size: 13px;
+}
 .set-row-labels {
   display: grid;
   grid-template-columns: 22px 1fr 1fr 46px 34px;
