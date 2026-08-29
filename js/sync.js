@@ -128,7 +128,20 @@ async function pushExercise(entry) {
   const { error } = await supabase
     .from("exercise_overrides")
     .upsert(
-      { name: entry.name, movement: entry.movement, muscles: entry.muscles || {}, athleticism: entry.athleticism || 0, joint_load: entry.jointLoad || {} },
+      {
+        name: entry.name,
+        movement: entry.movement,
+        muscles: entry.muscles || {},
+        athleticism: entry.athleticism || 0,
+        joint_load: entry.jointLoad || {},
+        // Added in schema/014 specifically so a custom/edited exercise's
+        // log type (isometric, bodyweight, ...) carries over to anywhere
+        // else that reads exercise_overrides -- this function just never
+        // actually sent it, so every override synced from here has always
+        // read back as the "weighted" default downstream, regardless of
+        // what it was actually set to in FitLog's own Library editor.
+        metric_type: entry.metricType || "weighted",
+      },
       { onConflict: "name" }
     );
   if (error) throw error;
