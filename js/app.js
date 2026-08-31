@@ -403,8 +403,7 @@ function renderExerciseList() {
   $$(".add-set-btn", wrap).forEach((btn) =>
     btn.addEventListener("click", () => {
       const ex = currentWorkout.exercises[+btn.dataset.ex];
-      const last = ex.sets[ex.sets.length - 1];
-      ex.sets.push({ reps: last?.reps ?? null, weight: last?.weight ?? null, duration: last?.duration ?? null, rpe: null, done: false });
+      ex.sets.push({ reps: null, weight: null, duration: null, rpe: null, done: false });
       renderExerciseList();
     })
   );
@@ -817,6 +816,7 @@ function getWeeklySummary() {
 function renderWeekSummary() {
   const el = $("#weekSummaryCard");
   const s = getWeeklySummary();
+  const unit = db.getSettings().unit;
   if (s.sessions === 0) {
     el.innerHTML = `<div class="week-summary-empty">No workouts logged yet this week (${escapeHtml(s.label)}).</div>`;
     return;
@@ -838,7 +838,7 @@ function renderWeekSummary() {
     ${
       s.prs.length
         ? `<div class="week-summary-prs">🎉 PR${s.prs.length > 1 ? "s" : ""}: ${s.prs
-            .map((p) => `${escapeHtml(p.name)} (${p.reps ?? "?"}×${p.weight})`)
+            .map((p) => `${escapeHtml(p.name)} (${p.weight}${unit}×${p.reps ?? "?"})`)
             .join(", ")}</div>`
         : ""
     }
@@ -879,7 +879,7 @@ function renderHistory() {
               .map((s) => {
                 const rpe = s.rpe != null ? ` @${s.rpe}` : "";
                 const warmupTag = s.isWarmup ? " w" : "";
-                return `${s.reps ?? "?"}×${s.weight != null ? s.weight : "?"}${unit}${rpe}${warmupTag}`;
+                return `${s.weight != null ? s.weight : "?"}${unit}×${s.reps ?? "?"}${rpe}${warmupTag}`;
               })
               .join(", ");
             const link = ex.linkedToNext && w.exercises[i + 1] ? " 🔗" : "";
